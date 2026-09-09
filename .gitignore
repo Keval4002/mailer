@@ -4,19 +4,13 @@ frontend-next/node_modules/
 frontend-next/.env.local
 frontend-next/out/
 
-# === Frontend (old Vite) ===
-frontend/node_modules/
-frontend/dist/
-
 # === Backend (Python) ===
 mailtfoutofit/.env
 mailtfoutofit/.venv/
-mailtfoutofit/__pycache__/
 mailtfoutofit/**/__pycache__/
 mailtfoutofit/.pytest_cache/
 mailtfoutofit/data/
 mailtfoutofit/apollo-contacts.csv
-mailtfoutofit/node_modules/
 
 # === General ===
 .DS_Store

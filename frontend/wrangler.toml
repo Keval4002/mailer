@@ -1,7 +1,0 @@
-name = "mailer-dashboard"
-compatibility_date = "2024-03-29"
-pages_build_output_dir = "dist"
-
-[vars]
-# For production, set VITE_API_URL to your Render/Railway backend URL
-VITE_API_URL = "https://your-backend-app.onrender.com"

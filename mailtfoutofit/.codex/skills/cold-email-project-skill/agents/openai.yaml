@@ -1,4 +1,0 @@
-interface:
-  display_name: "Cold Email Project Skill"
-  short_description: "Build cold-email jobs from any contact source"
-  default_prompt: "Use $cold-email-project-skill to turn one or more contacts plus runtime-written email content into scheduled mail jobs for this repo."
