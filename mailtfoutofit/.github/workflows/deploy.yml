@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python 3.11
+        run: uv python install 3.11
+
+      - name: Create venv and install deps
+        run: |
+          uv venv --python 3.11 .venv
+          uv pip install --python .venv/bin/python -r requirements.txt
+
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          pytest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Deploy to genserver
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.GENSERVER_HOST }}
+          username: ${{ secrets.GENSERVER_USER }}
+          key: ${{ secrets.GENSERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/utkarsh/serious-shit/mailtfoutofit
+            git pull --ff-only
+            ~/.local/bin/uv python install 3.11
+            ~/.local/bin/uv venv --clear --python 3.11 .venv
+            ~/.local/bin/uv pip install --python .venv/bin/python -r requirements.txt
+            pm2 restart mailtfoutofit --update-env -- -m uvicorn mail_scheduler.app:app --host 0.0.0.0 --port 8011
+            pm2 save

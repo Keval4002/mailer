@@ -1,0 +1,29 @@
+﻿name = "mailer-backend"
+main = "mail_scheduler/__init__.py"
+
+# Cloudflare Python Workers (beta)
+# See: https://developers.cloudflare.com/workers/languages/python/
+compatibility_flags = ["python_workers"]
+compatibility_date = "2024-12-01"
+
+[vars]
+MAIL_PROVIDER = "gmail_api"
+SCHEDULER_ENABLED = "true"
+SCHEDULER_POLL_SECONDS = "60"
+
+# Secrets (set via: wrangler secret put SECRET_NAME)
+# API_BEARER_TOKEN
+# GMAIL_CLIENT_ID
+# GMAIL_CLIENT_SECRET
+# GMAIL_REDIRECT_URI
+# MAIL_FROM
+# PUBLIC_BASE_URL
+# DATABASE_PATH
+
+[observability]
+enabled = true
+
+# NOTE: Cloudflare Python Workers is in beta and has limitations:
+# - No file system access (DATABASE_PATH must point to Cloudflare D1 or KV)
+# - asyncio is supported but some stdlib modules may not be available
+# For local dev: use `wrangler dev` or run directly via uvicorn

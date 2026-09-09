@@ -1,0 +1,1 @@
+"""Personal mail scheduler package."""

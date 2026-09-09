@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-neutral-soft: var(--neutral-soft);
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@layer base {
+  :root {
+    --bg-color: #fafafa;
+    --bg-gradient: radial-gradient(circle at 50% -20%, #ffffff 0%, #fafafa 100%);
+    --surface: rgba(255, 255, 255, 1);
+    --surface-sunk: #f4f5f6;
+    --border: #eaeaea;
+    --border-strong: #d0d0d0;
+    --text-main: #111111;
+    --text-muted: #666666;
+    --text-subtle: #888888;
+    --accent: #000000;
+    --accent-soft: rgba(0, 0, 0, 0.05);
+    --danger: #e5484d;
+    --danger-soft: rgba(229, 72, 77, 0.1);
+    --success: #30a46c;
+    --success-soft: rgba(48, 164, 108, 0.1);
+    --info: #0091ff;
+    --info-soft: rgba(0, 145, 255, 0.1);
+    --neutral-soft: #f4f4f5;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-color: #0c0c0c;
+      --bg-gradient: radial-gradient(circle at 50% -20%, #1a1a1a 0%, #0c0c0c 100%);
+      --surface: rgba(18, 18, 18, 1);
+      --surface-sunk: #151515;
+      --border: #2a2a2a;
+      --border-strong: #444444;
+      --text-main: #ededed;
+      --text-muted: #a1a1aa;
+      --text-subtle: #71717a;
+      --accent: #ffffff;
+      --accent-soft: rgba(255, 255, 255, 0.1);
+      --danger: #e5484d;
+      --danger-soft: rgba(229, 72, 77, 0.15);
+      --success: #30a46c;
+      --success-soft: rgba(48, 164, 108, 0.15);
+      --info: #0091ff;
+      --info-soft: rgba(0, 145, 255, 0.15);
+      --neutral-soft: #27272a;
+    }
+  }
+
+  body {
+    background-color: var(--bg-color);
+    background-image: var(--bg-gradient);
+    background-attachment: fixed;
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
