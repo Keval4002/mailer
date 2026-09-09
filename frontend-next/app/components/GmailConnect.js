@@ -1,32 +1,45 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
-import { Mail, CheckCircle2, AlertCircle, LogOut } from "lucide-react";
+import { Mail, CheckCircle2, AlertCircle, LogOut, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 
 export default function GmailConnect() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await api.get("/auth/gmail/status");
-        setStatus(res.data);
-      } catch (err) {
-        console.error("Failed to fetch Gmail status", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStatus();
-  }, []);
+  const fetchStatus = async () => {
+    try {
+      const res = await api.get("/auth/gmail/status");
+      setStatus(res.data);
+    } catch (err) {
+      console.error("Failed to fetch Gmail status", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchStatus(); }, []);
+
+  const handleDisconnect = async (e) => {
+    e.preventDefault();
+    setDisconnecting(true);
+    try {
+      // Use axios with maxRedirects: 0 so we don't follow the 303 to backend root
+      await api.post("/auth/gmail/disconnect", null, { maxRedirects: 0 });
+    } catch {
+      // 303 redirect throws with maxRedirects:0 — that's expected and fine
+    }
+    setStatus({ connected: false });
+    setDisconnecting(false);
+  };
 
   if (loading) {
     return (
       <div className="bg-surface border border-border rounded-xl p-6 shadow-sm flex items-center gap-3">
         <div className="animate-pulse w-4 h-4 bg-border rounded-full" />
-        <span className="text-text-muted text-sm">Checking Gmail Connection...</span>
+        <span className="text-text-muted text-sm">Checking Gmail connection...</span>
       </div>
     );
   }
@@ -63,9 +76,7 @@ export default function GmailConnect() {
           </h3>
           <p className="text-sm text-text-muted mt-1">
             {isConnected ? (
-              <span>
-                Connected as <b>{status.email}</b>
-              </span>
+              <span>Connected as <b>{status.email}</b></span>
             ) : (
               "Connect your Gmail account to start scheduling emails."
             )}
@@ -75,15 +86,20 @@ export default function GmailConnect() {
 
       <div>
         {isConnected ? (
-          <form action={`${apiBase}/auth/gmail/disconnect`} method="POST">
-            <button type="submit" className="btn-ghost !text-danger hover:!bg-danger-soft gap-2">
-              <LogOut size={16} /> Disconnect
+          <form onSubmit={handleDisconnect}>
+            <button
+              type="submit"
+              disabled={disconnecting}
+              className="btn-ghost !text-danger hover:!bg-danger-soft gap-2"
+            >
+              {disconnecting ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+              Disconnect
             </button>
           </form>
         ) : (
           <a
             href={`${apiBase}/auth/gmail/start?mode=local`}
-            className="btn bg-accent text-[var(--surface)] gap-2"
+            className="btn gap-2"
           >
             <Mail size={16} /> Connect Gmail
           </a>

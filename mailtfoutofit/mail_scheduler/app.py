@@ -613,12 +613,15 @@ def create_app(settings: Optional[Settings] = None):
         if not code:
             raise HTTPException(status_code=400, detail="Missing OAuth code")
         service.complete_gmail_oauth(code, redirect_uri)
-        return RedirectResponse(url="/", status_code=303)
+        # Redirect to frontend after OAuth — PUBLIC_BASE_URL should point to the frontend
+        frontend_url = resolved_settings.public_base_url or "http://localhost:3000"
+        return RedirectResponse(url=frontend_url, status_code=303)
 
     @app.post("/auth/gmail/disconnect")
     async def gmail_oauth_disconnect():
         service.disconnect_gmail()
-        return RedirectResponse(url="/", status_code=303)
+        # Return 200 JSON so the frontend can handle it without following the redirect
+        return {"disconnected": True}
 
     @app.get("/auth/gmail/status")
     async def gmail_oauth_status():
@@ -772,16 +775,15 @@ def create_app(settings: Optional[Settings] = None):
     async def upload_image(file: UploadFile = File(...)):
         import os
         import uuid
-        upload_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "uploads"
+        upload_dir = Path(__file__).resolve().parent.parent.parent / "frontend-next" / "public" / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
-        file_ext = os.path.splitext(file.filename)[1]
+        file_ext = os.path.splitext(file.filename or "")[1]
         unique_name = f"{uuid.uuid4().hex}{file_ext}"
         file_path = upload_dir / unique_name
         with open(file_path, "wb") as buffer:
             import shutil
             shutil.copyfileobj(file.file, buffer)
-        # In dev mode, public folder is served by Vite. 
-        # In prod, it is copied to dist/uploads. We return the relative URL.
+        # Next.js serves files from public/ at the root path
         return {"url": f"/uploads/{unique_name}"}
 
     # Serve React Frontend
