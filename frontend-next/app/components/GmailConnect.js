@@ -98,7 +98,7 @@ export default function GmailConnect() {
           </form>
         ) : (
           <a
-            href={`${apiBase}/auth/gmail/start?mode=local`}
+            href={`${apiBase}/auth/gmail/start`}
             className="btn gap-2"
           >
             <Mail size={16} /> Connect Gmail
