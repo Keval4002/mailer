@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Mailer — Record Application</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- ── Settings View ── -->
+  <div id="settings-view" class="view hidden">
+    <div class="view-header">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="16" height="12" rx="2"/>
+          <path d="M2 7L10 12L18 7"/>
+        </svg>
+        <span>Settings</span>
+      </div>
+    </div>
+
+    <div class="form-body">
+      <div class="field-group">
+        <label class="field-label">Backend API URL</label>
+        <input type="text" id="api-url" placeholder="http://127.0.0.1:8000" autocomplete="off" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">API Token <span class="label-muted">(Bearer)</span></label>
+        <input type="password" id="api-token" placeholder="Paste your token here" />
+      </div>
+      <p class="help-text">Find your token in your Mailer dashboard settings.</p>
+    </div>
+
+    <div class="form-footer">
+      <button id="back-to-main-btn" class="btn-ghost">Cancel</button>
+      <button id="save-settings-btn" class="btn-primary">Save Settings</button>
+    </div>
+  </div>
+
+  <!-- ── Main View ── -->
+  <div id="main-view" class="view">
+
+    <!-- Header -->
+    <div class="view-header">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="16" height="12" rx="2"/>
+          <path d="M2 7L10 12L18 7"/>
+        </svg>
+        <span>Mailer</span>
+      </div>
+      <div class="header-actions">
+        <button id="refresh-scrape-btn" class="icon-btn" title="Re-scan this page" aria-label="Refresh scrape">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4a8 8 0 1 1 0 12"/>
+            <path d="M4 4v4h4"/>
+          </svg>
+        </button>
+        <button id="go-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10" cy="10" r="2.5"/>
+            <path d="M10 2.5v1.2M10 16.3v1.2M2.5 10h1.2M16.3 10h1.2M4.4 4.4l.85.85M14.75 14.75l.85.85M4.4 15.6l.85-.85M14.75 5.25l.85-.85"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Auto-detected badge -->
+    <div id="detected-badge" class="detected-badge hidden">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="6"/><path d="M5.5 8l2 2 3-3"/>
+      </svg>
+      <span id="detected-text">Auto-filled from page</span>
+    </div>
+
+    <!-- Form body -->
+    <div class="form-body">
+
+      <!-- Row 1: Company + Role -->
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Company <span class="required-dot">*</span></label>
+          <input type="text" id="company-name" placeholder="e.g. Stripe" autocomplete="off" required />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Role</label>
+          <input type="text" id="role" placeholder="e.g. SWE Intern" />
+        </div>
+      </div>
+
+      <!-- Job URL (full width) -->
+      <div class="field-group">
+        <label class="field-label">Job URL</label>
+        <input type="text" id="job-url" placeholder="https://…" autocomplete="off" />
+      </div>
+
+      <!-- Row 2: Board + Status -->
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Job Board</label>
+          <input type="text" id="job-board" placeholder="LinkedIn, Lever…" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Status</label>
+          <select id="status">
+            <option value="Applied">Applied</option>
+            <option value="Emailed">Emailed</option>
+            <option value="Got a reply">Got a reply</option>
+            <option value="Interview scheduled">Interview scheduled</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Offer">Offer</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 3: Location + Salary (auto-filled when available) -->
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Location <span class="label-muted">(auto)</span></label>
+          <input type="text" id="location" placeholder="e.g. Remote / Bangalore" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Salary <span class="label-muted">(auto)</span></label>
+          <input type="text" id="salary" placeholder="e.g. ₹12 LPA" />
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="field-group">
+        <label class="field-label">Notes <span class="label-muted">(optional)</span></label>
+        <textarea id="notes" rows="2" placeholder="Any quick notes about this role…"></textarea>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="form-footer">
+      <div id="status-msg" class="status-msg" role="alert"></div>
+      <button id="submit-btn" class="btn-primary btn-full">
+        <svg class="btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3"/>
+        </svg>
+        <span class="btn-label">Record Application</span>
+        <span class="btn-spinner hidden">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2z" opacity="0.2"/>
+            <path d="M10 2a8 8 0 0 1 8 8"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

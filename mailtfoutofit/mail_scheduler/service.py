@@ -186,6 +186,19 @@ class MailSchedulerService:
                     is_active INTEGER NOT NULL DEFAULT 1
                 );
 
+                CREATE TABLE IF NOT EXISTS job_applications (
+                    id TEXT PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    role TEXT,
+                    job_url TEXT,
+                    job_board TEXT,
+                    status TEXT NOT NULL DEFAULT 'Applied',
+                    notes TEXT,
+                    applied_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS contacts (
                     id TEXT PRIMARY KEY,
                     apollo_person_id TEXT UNIQUE,
@@ -215,7 +228,8 @@ class MailSchedulerService:
                     replied_at TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    last_synced_at TEXT
+                    last_synced_at TEXT,
+                    job_application_id TEXT REFERENCES job_applications(id) ON DELETE SET NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS mail_jobs (
@@ -731,7 +745,8 @@ class MailSchedulerService:
                     replied_at TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    last_synced_at TEXT
+                    last_synced_at TEXT,
+                    job_application_id TEXT REFERENCES job_applications(id) ON DELETE SET NULL
                 )
                 """
             )
@@ -803,6 +818,7 @@ class MailSchedulerService:
             "has_replied": "INTEGER NOT NULL DEFAULT 0",
             "replied_at": "TEXT",
             "last_synced_at": "TEXT",
+            "job_application_id": "TEXT REFERENCES job_applications(id) ON DELETE SET NULL",
         }
         for column_name, column_type in desired_columns.items():
             if column_name not in existing_columns:
@@ -1252,6 +1268,7 @@ class MailSchedulerService:
         departments_json: Optional[str] = None,
         employment_history_json: Optional[str] = None,
         apollo_raw_json: Optional[str] = None,
+        job_application_id: Optional[str] = None,
     ):
         payload = self._contact_payload(
             apollo_person_id=apollo_person_id,
@@ -1276,6 +1293,7 @@ class MailSchedulerService:
             employment_history_json=employment_history_json,
             apollo_raw_json=apollo_raw_json,
             source=source,
+            job_application_id=job_application_id,
         )
         email = payload.get("email")
         apollo_person_id = payload.get("apollo_person_id")
@@ -1312,9 +1330,9 @@ class MailSchedulerService:
                     id, apollo_person_id, apollo_organization_id, email, linkedin_key, email_status, name, first_name,
                     last_name, linkedin_url, title, headline, company, company_domain, city, state, country,
                     formatted_address, timezone_name, seniority, departments_json, employment_history_json,
-                    apollo_raw_json, source, has_replied, replied_at, created_at, updated_at, last_synced_at
+                    apollo_raw_json, source, has_replied, replied_at, created_at, updated_at, last_synced_at, job_application_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
                 """,
                 (
                     contact_id,
@@ -1344,6 +1362,7 @@ class MailSchedulerService:
                     now,
                     now,
                     now,
+                    payload.get("job_application_id"),
                 ),
             )
             return contact_id
@@ -1362,7 +1381,7 @@ class MailSchedulerService:
                 first_name = ?, last_name = ?, linkedin_url = ?, title = ?, headline = ?, company = ?,
                 company_domain = ?, city = ?, state = ?, country = ?, formatted_address = ?, timezone_name = ?,
                 seniority = ?, departments_json = ?, employment_history_json = ?, apollo_raw_json = ?,
-                source = ?, updated_at = ?, last_synced_at = ?
+                source = ?, updated_at = ?, last_synced_at = ?, job_application_id = ?
             WHERE id = ?
             """,
             (
@@ -1391,6 +1410,7 @@ class MailSchedulerService:
                 merged["source"],
                 now,
                 now,
+                merged["job_application_id"],
                 contact_id,
             ),
         )
@@ -1536,6 +1556,7 @@ class MailSchedulerService:
                     job.get("company"),
                     job.get("title"),
                     job.get("linkedin_url"),
+                    job_application_id=job.get("job_application_id"),
                 )
                 job_id = str(uuid.uuid4())
                 client_job_id = self._clean_value(job.get("client_job_id"))
@@ -1685,6 +1706,7 @@ class MailSchedulerService:
                     contact_data.get("company"),
                     contact_data.get("title"),
                     contact_data.get("linkedin_url"),
+                    job_application_id=contact_data.get("job_application_id"),
                 )
                 workflow_id = str(uuid.uuid4())
                 connection.execute(
@@ -3505,3 +3527,69 @@ class MailSchedulerService:
         with self.connect() as conn:
             conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
 
+    def list_job_applications(self):
+        with self.connect() as conn:
+            cursor = conn.execute("SELECT * FROM job_applications ORDER BY created_at DESC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_job_application(self, application_id: str):
+        with self.connect() as conn:
+            cursor = conn.execute("SELECT * FROM job_applications WHERE id = ?", (application_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def create_job_application(self, data: dict):
+        import uuid
+        app_id = str(uuid.uuid4())
+        now = to_storage_datetime(utc_now())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO job_applications (
+                    id, company_name, role, job_url, job_board, status, notes, applied_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    app_id,
+                    data.get("company_name"),
+                    data.get("role"),
+                    data.get("job_url"),
+                    data.get("job_board"),
+                    data.get("status", "Applied"),
+                    data.get("notes"),
+                    data.get("applied_at", now),
+                    now,
+                    now,
+                )
+            )
+            return self.get_job_application(app_id)
+
+    def update_job_application(self, application_id: str, updates: dict):
+        if not updates:
+            return self.get_job_application(application_id)
+        
+        now = to_storage_datetime(utc_now())
+        set_clauses = []
+        values = []
+        for key, value in updates.items():
+            if key in ["company_name", "role", "job_url", "job_board", "status", "notes"]:
+                set_clauses.append(f"{key} = ?")
+                values.append(value)
+        
+        if not set_clauses:
+            return self.get_job_application(application_id)
+            
+        set_clauses.append("updated_at = ?")
+        values.append(now)
+        values.append(application_id)
+        
+        with self.connect() as conn:
+            conn.execute(
+                f"UPDATE job_applications SET {', '.join(set_clauses)} WHERE id = ?",
+                tuple(values)
+            )
+            return self.get_job_application(application_id)
+
+    def delete_job_application(self, application_id: str):
+        with self.connect() as conn:
+            conn.execute("DELETE FROM job_applications WHERE id = ?", (application_id,))

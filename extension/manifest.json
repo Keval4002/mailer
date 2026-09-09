@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Mailer — Job Tracker",
+  "version": "2.1",
+  "description": "Instantly record job applications from any job board into your Mailer CRM.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Mailer"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "contextMenus",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*",
+    "https://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.linkedin.com/jobs/*",
+        "https://*.indeed.com/viewjob*",
+        "https://*.indeed.com/rc/clk*",
+        "https://*.indeed.com/job/*",
+        "https://*.lever.co/*",
+        "https://*.greenhouse.io/*/jobs/*",
+        "https://boards.greenhouse.io/*/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://*.myworkdaysite.com/*",
+        "https://*.workday.com/*",
+        "https://wellfound.com/jobs/*",
+        "https://*.wellfound.com/jobs/*",
+        "https://jobs.ashbyhq.com/*/*",
+        "https://*.ashbyhq.com/*/jobs/*",
+        "https://*.smartrecruiters.com/*/posting/*",
+        "https://naukri.com/job-listings*",
+        "https://*.naukri.com/job-listings*",
+        "https://*.naukri.com/*/job/*",
+        "https://internshala.com/internship/*",
+        "https://internshala.com/job/*",
+        "https://*.jobvite.com/*/job/*",
+        "https://*.icims.com/jobs/*",
+        "https://*.taleo.net/*",
+        "https://*.rippling.com/jobs/*",
+        "https://*.freshteam.com/jobs/*",
+        "https://*.breezy.hr/p/*",
+        "https://*.bamboohr.com/careers/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

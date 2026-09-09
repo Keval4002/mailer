@@ -4,49 +4,55 @@
 
 @layer base {
   :root {
-    --bg-color: #fafafa;
-    --bg-gradient: radial-gradient(circle at 50% -20%, #ffffff 0%, #fafafa 100%);
-    --surface: rgba(255, 255, 255, 1);
-    --surface-sunk: #f4f5f6;
-    --border: #eaeaea;
-    --border-strong: #d0d0d0;
-    --text-main: #111111;
-    --text-muted: #666666;
-    --text-subtle: #888888;
-    --accent: #000000;
-    --accent-soft: rgba(0, 0, 0, 0.05);
-    --danger: #e5484d;
-    --danger-soft: rgba(229, 72, 77, 0.1);
-    --success: #30a46c;
-    --success-soft: rgba(48, 164, 108, 0.1);
-    --info: #0091ff;
-    --info-soft: rgba(0, 145, 255, 0.1);
-    --neutral-soft: #f4f4f5;
+    --bg-color: #f5f4f2;
+    --bg-gradient: radial-gradient(ellipse at 60% -10%, #e8e4df 0%, #f5f4f2 60%);
+    --surface: rgba(255, 255, 255, 0.92);
+    --surface-sunk: #eeece8;
+    --border: #dddad4;
+    --border-strong: #b8b4ac;
+    --text-main: #1a1814;
+    --text-muted: #6b6760;
+    --text-subtle: #9b9790;
+    --accent: #1a1814;
+    --accent-soft: rgba(26, 24, 20, 0.06);
+    --accent-glow: rgba(124, 109, 255, 0.0);
+    --danger: #d94040;
+    --danger-soft: rgba(217, 64, 64, 0.1);
+    --success: #1e8a52;
+    --success-soft: rgba(30, 138, 82, 0.1);
+    --info: #0077dd;
+    --info-soft: rgba(0, 119, 221, 0.1);
+    --neutral-soft: #eeecea;
+    --grain-opacity: 0.025;
   }
 
+  /* ── Dark mode (always render as dark — grunge premium) ── */
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg-color: #0c0c0c;
-      --bg-gradient: radial-gradient(circle at 50% -20%, #1a1a1a 0%, #0c0c0c 100%);
-      --surface: rgba(18, 18, 18, 1);
-      --surface-sunk: #151515;
-      --border: #2a2a2a;
-      --border-strong: #444444;
-      --text-main: #ededed;
-      --text-muted: #a1a1aa;
-      --text-subtle: #71717a;
-      --accent: #ffffff;
-      --accent-soft: rgba(255, 255, 255, 0.1);
-      --danger: #e5484d;
-      --danger-soft: rgba(229, 72, 77, 0.15);
-      --success: #30a46c;
-      --success-soft: rgba(48, 164, 108, 0.15);
-      --info: #0091ff;
-      --info-soft: rgba(0, 145, 255, 0.15);
-      --neutral-soft: #27272a;
+      --bg-color: #0b0a09;
+      --bg-gradient: radial-gradient(ellipse at 50% -30%, #1c1815 0%, #0b0a09 70%);
+      --surface: #141210;
+      --surface-sunk: #0e0d0b;
+      --border: #2a2622;
+      --border-strong: #4a4540;
+      --text-main: #f0ece6;
+      --text-muted: #9a9288;
+      --text-subtle: #6a6460;
+      --accent: #f0ece6;
+      --accent-soft: rgba(240, 236, 230, 0.08);
+      --accent-glow: rgba(124, 109, 255, 0.18);
+      --danger: #e05050;
+      --danger-soft: rgba(224, 80, 80, 0.14);
+      --success: #2eaa65;
+      --success-soft: rgba(46, 170, 101, 0.14);
+      --info: #3b9eff;
+      --info-soft: rgba(59, 158, 255, 0.14);
+      --neutral-soft: #1e1c19;
+      --grain-opacity: 0.045;
     }
   }
 
+  /* ── Base body ── */
   body {
     background-color: var(--bg-color);
     background-image: var(--bg-gradient);
@@ -55,6 +61,21 @@
     font-family: "Inter", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Grain overlay via pseudo-element hack on html */
+  }
+
+  /* Grain texture on root */
+  html::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: overlay;
   }
 
   input, textarea, select {
@@ -70,12 +91,13 @@
   }
 
   input:focus, textarea:focus, select:focus {
-    border-color: var(--border-strong);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    border-color: #7c6dff;
+    box-shadow: 0 0 0 3px rgba(124, 109, 255, 0.2);
   }
 }
 
 @layer components {
+  /* ── Primary button ── */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -83,30 +105,37 @@
     gap: 0.5rem;
     min-height: 36px;
     padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     border: 1px solid transparent;
-    background-color: var(--accent);
-    color: var(--surface);
+    background: linear-gradient(135deg, #7c6dff 0%, #5b4fd4 100%);
+    color: #ffffff;
     font-size: 0.875rem;
-    font-weight: 500;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    transition: all 0.15s;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(124, 109, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+    transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
     cursor: pointer;
     text-decoration: none;
   }
 
   .btn:hover {
-    opacity: 0.88;
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 16px rgba(124, 109, 255, 0.4), 0 0 0 1px rgba(124, 109, 255, 0.5);
+    background: linear-gradient(135deg, #8c7dff 0%, #6b5fe4 100%);
+  }
+
+  .btn:active {
+    transform: translateY(0);
   }
 
   .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
   }
 
+  /* ── Ghost button ── */
   .btn-ghost {
     display: inline-flex;
     align-items: center;
@@ -114,7 +143,7 @@
     gap: 0.5rem;
     min-height: 36px;
     padding: 0.5rem 0.75rem;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--border);
     background-color: transparent;
     color: var(--text-muted);
@@ -127,5 +156,86 @@
   .btn-ghost:hover {
     background-color: var(--neutral-soft);
     color: var(--text-main);
+    border-color: var(--border-strong);
   }
+
+  /* ── Danger ghost ── */
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 36px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--danger);
+    background-color: var(--danger-soft);
+    color: var(--danger);
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+
+  .btn-danger:hover {
+    background-color: var(--danger);
+    color: #fff;
+  }
+
+  /* ── Grunge card ── */
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    overflow: hidden;
+    transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-size: 120px 120px;
+    opacity: 0.03;
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 0;
+  }
+
+  .card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .card:hover {
+    border-color: rgba(124, 109, 255, 0.35);
+    box-shadow: 0 0 0 1px rgba(124, 109, 255, 0.1), 0 8px 32px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+  }
+
+  /* ── Accent-glow hover overlay ── */
+  .card .card-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top left, rgba(124, 109, 255, 0.06), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 0;
+  }
+
+  .card:hover .card-glow {
+    opacity: 1;
+  }
+
+  /* ── Status badge chips ── */
+  .status-applied    { background: rgba(59, 158, 255, 0.12); color: #3b9eff; border: 1px solid rgba(59,158,255,0.25); }
+  .status-emailed    { background: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168,85,247,0.25); }
+  .status-reply      { background: rgba(234, 179, 8, 0.12);  color: #c8a000; border: 1px solid rgba(234,179,8,0.25); }
+  .status-interview  { background: rgba(99, 102, 241, 0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.25); }
+  .status-rejected   { background: rgba(224, 80, 80, 0.12);  color: #e05050; border: 1px solid rgba(224,80,80,0.25); }
+  .status-offer      { background: rgba(46, 170, 101, 0.12); color: #2eaa65; border: 1px solid rgba(46,170,101,0.25); }
 }

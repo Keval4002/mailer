@@ -513,6 +513,7 @@ def create_app(settings: Optional[Settings] = None):
                         "recipient_name": name or None,
                         "company": company or None,
                         "title": title or None,
+                        "job_application_id": c.get("job_application_id"),
                     },
                     "steps": steps
                 })
@@ -770,6 +771,42 @@ def create_app(settings: Optional[Settings] = None):
     async def delete_reminder(reminder_id: str):
         service.delete_reminder(reminder_id)
         return {"success": True}
+
+    class JobApplicationCreate(BaseModel):
+        company_name: str
+        role: Optional[str] = None
+        job_url: Optional[str] = None
+        job_board: Optional[str] = None
+        status: Optional[str] = "Applied"
+        notes: Optional[str] = None
+
+    class JobApplicationUpdate(BaseModel):
+        company_name: Optional[str] = None
+        role: Optional[str] = None
+        job_url: Optional[str] = None
+        job_board: Optional[str] = None
+        status: Optional[str] = None
+        notes: Optional[str] = None
+
+    @app.get("/api/applications", dependencies=[Depends(require_api_token)])
+    async def get_applications():
+        return {"applications": service.list_job_applications()}
+
+    @app.post("/api/applications", dependencies=[Depends(require_api_token)])
+    async def create_application(payload: JobApplicationCreate):
+        return service.create_job_application(payload.model_dump(exclude_none=True))
+
+    @app.patch("/api/applications/{app_id}", dependencies=[Depends(require_api_token)])
+    async def update_application(app_id: str, payload: JobApplicationUpdate):
+        return service.update_job_application(app_id, payload.model_dump(exclude_none=True))
+
+    @app.delete("/api/applications/{app_id}", dependencies=[Depends(require_api_token)])
+    async def delete_application(app_id: str):
+        existing = service.get_job_application(app_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Application not found")
+        service.delete_job_application(app_id)
+        return {"ok": True}
 
     @app.post("/api/upload-image")
     async def upload_image(file: UploadFile = File(...)):
