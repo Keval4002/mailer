@@ -245,11 +245,13 @@ class MailSchedulerService:
                     scheduled_at TEXT NOT NULL,
                     requested_scheduled_at TEXT NOT NULL,
                     timezone_label TEXT,
-                    status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'cancelled', 'blocked')),
+                    status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'cancelled', 'blocked', 'gmail_scheduled')),
                     attachment_mode TEXT NOT NULL CHECK (attachment_mode IN ('none', 'latest_resume')),
                     message_id TEXT,
                     gmail_message_id TEXT,
                     gmail_thread_id TEXT,
+                    gmail_draft_id TEXT,
+                    gmail_scheduled_at TEXT,
                     parent_job_id TEXT,
                     root_job_id TEXT,
                     reply_stop_enabled INTEGER NOT NULL DEFAULT 1,
@@ -946,7 +948,12 @@ class MailSchedulerService:
             "blocked_reason",
         }
         current_sql = self._table_sql(connection, "mail_jobs")
-        needs_rebuild = not required_columns.issubset(existing_columns) or "'blocked'" not in current_sql
+        needs_rebuild = (
+            not required_columns.issubset(existing_columns)
+            or "'blocked'" not in current_sql
+            or "'gmail_scheduled'" not in current_sql
+            or "gmail_draft_id" not in existing_columns
+        )
         if not needs_rebuild:
             connection.execute(
                 """
@@ -975,11 +982,13 @@ class MailSchedulerService:
                 scheduled_at TEXT NOT NULL,
                 requested_scheduled_at TEXT NOT NULL,
                 timezone_label TEXT,
-                status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'cancelled', 'blocked')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'cancelled', 'blocked', 'gmail_scheduled')),
                 attachment_mode TEXT NOT NULL CHECK (attachment_mode IN ('none', 'latest_resume')),
                 message_id TEXT,
                 gmail_message_id TEXT,
                 gmail_thread_id TEXT,
+                gmail_draft_id TEXT,
+                gmail_scheduled_at TEXT,
                 parent_job_id TEXT,
                 root_job_id TEXT,
                 reply_stop_enabled INTEGER NOT NULL DEFAULT 1,
@@ -1013,6 +1022,8 @@ class MailSchedulerService:
             "message_id": "message_id" if "message_id" in old_columns else "NULL",
             "gmail_message_id": "gmail_message_id" if "gmail_message_id" in old_columns else "NULL",
             "gmail_thread_id": "gmail_thread_id" if "gmail_thread_id" in old_columns else "NULL",
+            "gmail_draft_id": "gmail_draft_id" if "gmail_draft_id" in old_columns else "NULL",
+            "gmail_scheduled_at": "gmail_scheduled_at" if "gmail_scheduled_at" in old_columns else "NULL",
             "parent_job_id": "parent_job_id" if "parent_job_id" in old_columns else "NULL",
             "root_job_id": "COALESCE(root_job_id, id)" if "root_job_id" in old_columns else "id",
             "reply_stop_enabled": "COALESCE(reply_stop_enabled, 1)" if "reply_stop_enabled" in old_columns else "1",
@@ -1423,11 +1434,14 @@ class MailSchedulerService:
                 COALESCE(stats.total_jobs, 0) AS total_jobs,
                 COALESCE(stats.sent_count, 0) AS sent_count,
                 COALESCE(stats.pending_count, 0) AS pending_count,
+                COALESCE(stats.gmail_scheduled_count, 0) AS gmail_scheduled_count,
                 COALESCE(stats.failed_count, 0) AS failed_count,
                 COALESCE(stats.cancelled_count, 0) AS cancelled_count,
                 COALESCE(stats.blocked_count, 0) AS blocked_count,
                 stats.last_sent_at,
-                stats.last_scheduled_at
+                stats.last_scheduled_at,
+                stats.first_scheduled_at,
+                stats.next_scheduled_at
             FROM contacts
             LEFT JOIN (
                 SELECT
@@ -1435,11 +1449,14 @@ class MailSchedulerService:
                     COUNT(*) AS total_jobs,
                     SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent_count,
                     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
+                    SUM(CASE WHEN status = 'gmail_scheduled' THEN 1 ELSE 0 END) AS gmail_scheduled_count,
                     SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
                     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
                     SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked_count,
                     MAX(sent_at) AS last_sent_at,
-                    MAX(scheduled_at) AS last_scheduled_at
+                    MAX(scheduled_at) AS last_scheduled_at,
+                    MIN(scheduled_at) AS first_scheduled_at,
+                    MIN(CASE WHEN status IN ('pending', 'gmail_scheduled') THEN scheduled_at ELSE NULL END) AS next_scheduled_at
                 FROM mail_jobs
                 GROUP BY contact_id
             ) AS stats ON stats.contact_id = contacts.id
@@ -1736,13 +1753,17 @@ class MailSchedulerService:
                     if not step_id:
                         raise HTTPException(status_code=400, detail="step_id is required")
                     if step_type == "email":
-                        subject = self._clean_value(step.get("subject"))
+                        subject = self._clean_value(step.get("subject")) or ""
                         body_text = self._clean_value(step.get("body_text"))
-                        if not subject or not body_text:
-                            raise HTTPException(status_code=400, detail="email step requires subject and body_text")
+                        parent_step_id = self._clean_value(step.get("thread_parent_step_id"))
+
+                        if not body_text:
+                            raise HTTPException(status_code=400, detail="email step requires body_text")
+                        if not parent_step_id and not subject:
+                            raise HTTPException(status_code=400, detail="initial email step requires subject")
+
                         parsed = parse_datetime(step["scheduled_at"])
                         job_id = str(uuid.uuid4())
-                        parent_step_id = self._clean_value(step.get("thread_parent_step_id"))
                         parent_job_id = mail_step_ids.get(parent_step_id) if parent_step_id else None
                         if parent_step_id and not parent_job_id:
                             raise HTTPException(status_code=400, detail="thread_parent_step_id must reference an earlier email step")
@@ -2260,6 +2281,184 @@ class MailSchedulerService:
                 (now,),
             ).fetchall()
         return [row["id"] for row in rows]
+
+    def reschedule_overdue_jobs(self) -> int:
+        """On server startup, move ALL overdue pending jobs to the next 9 AM IST window.
+
+        - If current IST time < 09:00 today  →  schedule for today at 09:00 IST
+        - If current IST time >= 09:00 today →  schedule for tomorrow at 09:00 IST
+
+        All overdue jobs get the SAME scheduled_at so they all send together in
+        one batch (not staggered). Returns the number of jobs rescheduled.
+        """
+        from zoneinfo import ZoneInfo
+        IST = ZoneInfo("Asia/Kolkata")
+
+        now_utc = utc_now()
+        now_ist = now_utc.astimezone(IST)
+
+        # Build today's 9 AM IST
+        target_ist = now_ist.replace(hour=9, minute=0, second=0, microsecond=0)
+
+        # If 9 AM has already passed, move to tomorrow
+        if now_ist >= target_ist:
+            target_ist = target_ist + timedelta(days=1)
+
+        target_utc = target_ist.astimezone(timezone.utc)
+        target_storage = to_storage_datetime(target_utc)
+        now_storage = to_storage_datetime(now_utc)
+
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id FROM mail_jobs
+                WHERE status = 'pending' AND scheduled_at < ?
+                ORDER BY scheduled_at ASC
+                """,
+                (now_storage,),
+            ).fetchall()
+
+            if rows:
+                connection.executemany(
+                    "UPDATE mail_jobs SET scheduled_at = ?, updated_at = ? WHERE id = ?",
+                    [(target_storage, now_storage, row["id"]) for row in rows],
+                )
+
+        count = len(rows)
+        if count > 0:
+            print(
+                f"[Startup] Rescheduled {count} overdue job(s) → all set to "
+                f"{target_ist.strftime('%d %b %Y at 9:00 AM IST')} (sent together)."
+            )
+        return count
+
+    def push_upcoming_jobs_to_gmail(self) -> int:
+        """On server startup, clean up any orphaned Gmail drafts from previous failed
+        scheduled-send attempts, and reset those jobs back to 'pending'.
+
+        Gmail's public REST API v1 does not support scheduled-send (deliveryTime) for
+        personal accounts. Drafts can be created but cannot be scheduled via the API.
+        Scheduling is handled by the server's scheduler_loop instead.
+
+        Returns the number of orphaned drafts cleaned up.
+        """
+        cleaned = 0
+        with self.connect() as connection:
+            auth_row = self._get_valid_gmail_auth(connection, required=False)
+
+            # Find any jobs stuck in gmail_scheduled (from a previous failed attempt)
+            rows = connection.execute(
+                """
+                SELECT id, gmail_draft_id FROM mail_jobs
+                WHERE status = 'gmail_scheduled'
+                """,
+            ).fetchall()
+
+            for row in rows:
+                job_id = row["id"]
+                draft_id = row["gmail_draft_id"]
+                # Delete the orphaned draft from Gmail if we have auth
+                if draft_id and auth_row:
+                    try:
+                        gmail_api.cancel_scheduled_draft(auth_row["access_token"], draft_id)
+                        print(f"[Startup] Deleted orphaned Gmail draft {draft_id[:12]}… for job {job_id[:8]}…")
+                    except Exception as exc:
+                        print(f"[Startup] Could not delete draft {draft_id[:12]}…: {exc}")
+                # Reset the job to pending
+                connection.execute(
+                    """
+                    UPDATE mail_jobs
+                    SET status = 'pending',
+                        gmail_draft_id = NULL,
+                        gmail_scheduled_at = NULL,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (to_storage_datetime(utc_now()), job_id),
+                )
+                cleaned += 1
+
+        if cleaned:
+            print(f"[Startup] Reset {cleaned} gmail_scheduled job(s) back to pending.")
+        return cleaned
+
+    def cancel_gmail_draft_for_job(self, connection, job_id: str) -> bool:
+        """Cancel a gmail_scheduled job by deleting its Gmail draft.
+
+        Returns True if cancelled, False if job was not gmail_scheduled.
+        """
+        job_row = self._load_job_row(connection, job_id)
+        if job_row["status"] != "gmail_scheduled":
+            return False
+
+        draft_id = job_row.get("gmail_draft_id")
+        if draft_id:
+            try:
+                auth_row = self._get_valid_gmail_auth(connection, required=False)
+                if auth_row:
+                    gmail_api.cancel_scheduled_draft(auth_row["access_token"], draft_id)
+            except Exception as exc:
+                print(f"[Cancel] Failed to delete Gmail draft {draft_id}: {exc}")
+
+        connection.execute(
+            """
+            UPDATE mail_jobs
+            SET status = 'cancelled',
+                blocked_reason = 'contact_replied_manual',
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (to_storage_datetime(utc_now()), job_id),
+        )
+        return True
+
+    def mark_contact_replied(self, contact_id: str) -> Dict:
+        """Mark a contact as having replied, and cancel all pending/gmail_scheduled follow-ups."""
+        now = to_storage_datetime(utc_now())
+        cancelled_jobs = []
+
+        with self.connect() as connection:
+            # Mark the contact
+            connection.execute(
+                """
+                UPDATE contacts
+                SET has_replied = 1, replied_at = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (now, now, contact_id),
+            )
+
+            # Find all non-terminal follow-up jobs (excluding root/first emails)
+            rows = connection.execute(
+                """
+                SELECT id, status, parent_job_id
+                FROM mail_jobs
+                WHERE contact_id = ?
+                  AND status IN ('pending', 'gmail_scheduled')
+                  AND parent_job_id IS NOT NULL
+                ORDER BY scheduled_at ASC
+                """,
+                (contact_id,),
+            ).fetchall()
+
+            for row in rows:
+                job_id = row["id"]
+                if row["status"] == "gmail_scheduled":
+                    self.cancel_gmail_draft_for_job(connection, job_id)
+                else:
+                    connection.execute(
+                        """
+                        UPDATE mail_jobs
+                        SET status = 'cancelled',
+                            blocked_reason = 'contact_replied_manual',
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (now, job_id),
+                    )
+                cancelled_jobs.append(job_id)
+
+        return {"contact_id": contact_id, "cancelled_jobs": len(cancelled_jobs)}
 
     def revive_failed_mail_jobs(self):
         gmail_status = self.get_gmail_auth_status()
@@ -3527,10 +3726,64 @@ class MailSchedulerService:
         with self.connect() as conn:
             conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
 
-    def list_job_applications(self):
+    def list_job_applications(
+        self,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        job_board: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        sort: str = "newest",
+    ):
+        conditions = []
+        params = []
+
+        if search:
+            like = f"%{search}%"
+            conditions.append("(company_name LIKE ? OR role LIKE ?)")
+            params.extend([like, like])
+
+        if status:
+            # Support comma-separated multi-status filter
+            statuses = [s.strip() for s in status.split(",") if s.strip()]
+            if statuses:
+                placeholders = ",".join("?" * len(statuses))
+                conditions.append(f"status IN ({placeholders})")
+                params.extend(statuses)
+
+        if job_board:
+            conditions.append("job_board = ?")
+            params.append(job_board)
+
+        if date_from:
+            conditions.append("applied_at >= ?")
+            params.append(date_from)
+
+        if date_to:
+            conditions.append("applied_at <= ?")
+            params.append(date_to)
+
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        order_map = {
+            "newest": "applied_at DESC, created_at DESC",
+            "oldest": "applied_at ASC, created_at ASC",
+            "company": "company_name ASC",
+        }
+        order_clause = f"ORDER BY {order_map.get(sort, 'applied_at DESC, created_at DESC')}"
+
+        sql = f"SELECT * FROM job_applications {where_clause} {order_clause}"
         with self.connect() as conn:
-            cursor = conn.execute("SELECT * FROM job_applications ORDER BY created_at DESC")
+            cursor = conn.execute(sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
+
+    def list_job_applications_boards(self):
+        """Return distinct non-null job boards for filter dropdowns."""
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "SELECT DISTINCT job_board FROM job_applications WHERE job_board IS NOT NULL AND job_board != '' ORDER BY job_board"
+            )
+            return [row[0] for row in cursor.fetchall()]
 
     def get_job_application(self, application_id: str):
         with self.connect() as conn:

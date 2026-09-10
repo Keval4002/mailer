@@ -12,6 +12,7 @@ export default function RemindersPage() {
   const [creating,    setCreating]    = useState(false);
   const [newTitle,    setNewTitle]    = useState("");
   const [newContent,  setNewContent]  = useState("");
+  const [isExpanded,  setIsExpanded]  = useState(false);
   const [deleteTarget,setDeleteTarget]= useState(null); // id of note pending deletion
   const [deleting,    setDeleting]    = useState(false);
   const fileInputRef = useRef(null);
@@ -37,6 +38,7 @@ export default function RemindersPage() {
       await api.post("/api/reminders", { title: newTitle, content_text: newContent });
       setNewTitle("");
       setNewContent("");
+      setIsExpanded(false);
       await fetchReminders();
     } catch (err) {
       console.error(err);
@@ -88,64 +90,79 @@ export default function RemindersPage() {
         </div>
 
         <div className="space-y-8">
-          {/* Create card */}
-          <div className="card overflow-hidden">
-            <div className="card-glow" />
-            <div className="flex items-center gap-3 p-5 border-b border-border">
-              <div className="w-8 h-8 rounded-lg bg-[rgba(124,109,255,0.1)] flex items-center justify-center text-[#7c6dff]">
-                <Plus size={16} />
-              </div>
-              <h2 className="m-0 text-base font-bold text-text-main">New Note</h2>
-            </div>
-            <form onSubmit={handleCreate} className="p-5 flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Title (e.g. Upcoming Interview at XYZ)"
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                className="text-base font-semibold !bg-neutral-soft !border-transparent focus:!bg-surface focus:!border-[rgba(124,109,255,0.4)] rounded-lg px-4 py-3 transition-all"
-                required
-              />
-              <div className="relative">
+          {/* Keep-style Expanding Input */}
+          <div className="relative max-w-2xl mx-auto mb-12">
+            <div
+              className={`card overflow-hidden transition-all duration-300 border ${
+                isExpanded ? "shadow-xl border-[rgba(124,109,255,0.3)] bg-surface" : "shadow-md border-border hover:shadow-lg bg-surface"
+              }`}
+            >
+              <form onSubmit={handleCreate}>
+                {isExpanded && (
+                  <input
+                    type="text"
+                    placeholder="Title"
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    className="w-full px-4 pt-4 pb-2 text-base font-bold bg-transparent border-none outline-none text-text-main placeholder-text-subtle"
+                  />
+                )}
+                
                 <textarea
-                  placeholder="Jot down notes, paste updates, use Markdown…"
+                  placeholder={isExpanded ? "Take a note…" : "Take a note…"}
                   value={newContent}
                   onChange={e => setNewContent(e.target.value)}
-                  className="w-full min-h-[140px] p-4 pb-12 !bg-neutral-soft !border-transparent focus:!bg-surface focus:!border-[rgba(124,109,255,0.4)] rounded-lg resize-none transition-all"
-                  required
+                  onFocus={() => setIsExpanded(true)}
+                  className={`w-full px-4 bg-transparent border-none outline-none resize-none text-sm text-text-main placeholder-text-subtle transition-all duration-300 ${
+                    isExpanded ? "min-h-[120px] py-2 pb-12" : "h-[46px] py-3 overflow-hidden cursor-text"
+                  }`}
+                  required={isExpanded}
                 />
-                <div className="absolute bottom-3 left-3 flex gap-2">
-                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="btn-ghost !px-2.5 !py-1 !min-h-[28px] !text-xs !gap-1.5"
-                    title="Upload Image"
-                  >
-                    <ImageIcon size={12} /> Image
-                  </button>
-                </div>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="btn absolute bottom-3 right-3 !px-4 !py-1 !min-h-[28px] !text-xs"
-                >
-                  {creating ? <Loader2 size={12} className="animate-spin" /> : null}
-                  {creating ? "Saving…" : "Save Note"}
-                </button>
-              </div>
-            </form>
+                
+                {isExpanded && (
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                    <div className="flex gap-2">
+                      <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:bg-neutral-soft hover:text-text-main transition-colors"
+                        title="Add image"
+                      >
+                        <ImageIcon size={16} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setIsExpanded(false); setNewTitle(""); setNewContent(""); }}
+                        className="btn-ghost !px-4 !py-1.5 !min-h-[32px] !text-xs font-semibold"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={creating || !newContent.trim()}
+                        className="btn !px-4 !py-1.5 !min-h-[32px] !text-xs font-semibold"
+                      >
+                        {creating ? <Loader2 size={14} className="animate-spin" /> : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
           </div>
 
-          {/* Notes grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Notes grid (Masonry) */}
+          <div className="columns-1 md:columns-2 lg:columns-3 gap-5 space-y-5">
             {loading ? (
-              <div className="col-span-full py-16 text-center text-text-muted flex flex-col items-center gap-3">
+              <div className="py-16 text-center text-text-muted flex flex-col items-center gap-3 break-inside-avoid">
                 <div className="w-7 h-7 rounded-full border-2 border-[rgba(124,109,255,0.2)] border-t-[#7c6dff] animate-spin" />
                 Loading notes…
               </div>
             ) : reminders.length === 0 ? (
-              <div className="col-span-full card flex flex-col items-center justify-center p-16 text-center">
+              <div className="card flex flex-col items-center justify-center p-16 text-center break-inside-avoid">
                 <div className="card-glow" />
                 <div className="w-14 h-14 rounded-2xl bg-[rgba(124,109,255,0.08)] flex items-center justify-center mb-4 text-[#7c6dff]">
                   <StickyNote size={28} />
@@ -156,7 +173,7 @@ export default function RemindersPage() {
               reminders.map(r => (
                 <div
                   key={r.id}
-                  className={`card group flex flex-col p-5 transition-all duration-300 ${
+                  className={`card group flex flex-col p-5 transition-all duration-300 break-inside-avoid inline-block w-full ${
                     deleteTarget === r.id ? "border-danger/50 shadow-[0_0_0_1px_rgba(224,80,80,0.2)]" : ""
                   }`}
                 >

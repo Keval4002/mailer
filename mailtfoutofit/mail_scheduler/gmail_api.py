@@ -10,6 +10,7 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_API_ROOT = "https://gmail.googleapis.com/gmail/v1/users/me"
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
@@ -148,3 +149,77 @@ def get_thread(access_token: str, gmail_thread_id: str):
             },
         )
     return _json_or_raise(response)
+
+
+def create_scheduled_draft(
+    access_token: str,
+    raw_bytes: bytes,
+    deliver_at_rfc3339: str,
+    thread_id: Optional[str] = None,
+) -> Dict:
+    """Create a Gmail draft and schedule it for delivery at deliver_at_rfc3339.
+
+    Uses the official Gmail API:
+      1. POST /drafts          → creates the draft
+      2. POST /drafts/send     → schedules it with scheduleTime (ID goes in body, NOT URL)
+
+    Returns dict with keys: draft_id, message_id, thread_id (may be None).
+    The scheduleTime must be at least 5 minutes in the future.
+    If the schedule step fails the draft is automatically deleted so Gmail stays clean.
+    """
+    payload: Dict[str, object] = {
+        "message": {"raw": base64.urlsafe_b64encode(raw_bytes).decode("utf-8")}
+    }
+    if thread_id:
+        payload["message"]["threadId"] = thread_id
+
+    with httpx.Client(timeout=30.0) as client:
+        # Step 1: create draft
+        draft_response = _json_or_raise(
+            client.post(
+                "%s/drafts" % GMAIL_API_ROOT,
+                headers=_auth_headers(access_token),
+                json=payload,
+            )
+        )
+        draft_id = draft_response["id"]
+
+        try:
+            # Step 2: schedule via /drafts/send — the draft ID goes in the BODY, not the URL
+            # Using scheduleTime (not deliveryTime) per the Gmail API spec
+            send_response = _json_or_raise(
+                client.post(
+                    "%s/drafts/send" % GMAIL_API_ROOT,
+                    headers=_auth_headers(access_token),
+                    json={"id": draft_id, "scheduleTime": deliver_at_rfc3339},
+                )
+            )
+        except Exception:
+            # Schedule step failed — delete the orphaned draft so Gmail stays clean
+            try:
+                client.delete("%s/drafts/%s" % (GMAIL_API_ROOT, draft_id), headers=_auth_headers(access_token))
+            except Exception:
+                pass
+            raise
+
+    return {
+        "draft_id": draft_id,
+        "message_id": send_response.get("id"),
+        "thread_id": send_response.get("threadId"),
+    }
+
+
+def cancel_scheduled_draft(access_token: str, draft_id: str) -> None:
+    """Delete a Gmail draft to cancel a scheduled send.
+
+    Once deleted, Gmail will not deliver the message.
+    Raises GmailApiError on failure (404 = already sent/deleted, safe to ignore).
+    """
+    with httpx.Client(timeout=20.0) as client:
+        response = client.delete(
+            "%s/drafts/%s" % (GMAIL_API_ROOT, draft_id),
+            headers=_auth_headers(access_token),
+        )
+    if response.status_code == 404:
+        return  # Already sent or deleted — that's fine
+    _json_or_raise(response)

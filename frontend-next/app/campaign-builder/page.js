@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import api from "@/lib/api";
 import { Plus, X, Loader2, CheckCircle2, AlertCircle, Send, Users, Mail } from "lucide-react";
 import TopNav from "@/app/components/TopNav";
@@ -10,43 +10,38 @@ const TEMPLATES = {
   generic_full_time: {
     steps: [
       {
-        subject: "Exploring Engineering Opportunities at {company}",
+        subject: "Application: Engineering Opportunities at {company} / Keval Ambani",
         body: `Hi {name},
 
-I hope you're doing well!
+I recently submitted my application for an engineering role at {company} and wanted to reach out directly to introduce myself.
 
-I'm Keval Ambani, a Computer Engineering student at Thapar Institute of Engineering and Technology (Batch 2027), and I'm reaching out because I'm genuinely excited about the engineering work happening at {company}.
+I'm Keval Ambani, a Computer Engineering student at Thapar Institute (2027). I'm reaching out because I've been building and shipping full-stack products with a strong focus on AI, and I'm very interested in the work your team is doing.
 
-Some highlights from my recent work:
+To give you a quick sense of my background:
+- I built an AI business-automation agent running for 2 businesses.
+- I built a timetable platform used by 10,000+ students.
+- During my internship at Neural Network Labs, I built AI-powered presentation workflows.
+- I've also worked as a freelance developer on a global B2B marketplace and production web projects.
 
-- Built VyapaarSetu, an AI agent using LangGraph deep agents + FastMCP that automates lead qualification, invoicing, scheduling and order fulfillment for 2 active stores across India, reducing repetitive operational effort by 70%+. Integrated WhatsApp Business, Google Calendar and Razorpay through MCP-powered tool calling.
-- At Neural Network Labs (Full Stack Intern), built AI-powered presentation generation workflows using Gemini and async workers, reducing creation time to under 120 seconds and contributing to 20%+ growth in trial adoption.
-- Freelanced at GlassFactory building a Tariff Calculator and implementing adaptive bitrate streaming via AWS MediaConvert for a global B2B marketplace.
+I'm particularly interested in software engineering roles where I can work close to the product and build things end-to-end, whether that's an internship now or a full-time role after I graduate in 2027.
 
-My stack: React, Next.js, Node.js, FastAPI, LangGraph, Python, PostgreSQL, Docker, and I'm actively building with agentic AI tools.
+Would you be open to a brief conversation about any upcoming engineering opportunities at {company}?
 
-You can explore my work here:
-- GitHub: https://github.com/Keval4002
-- LinkedIn: https://www.linkedin.com/in/keval-ambani-9ba99532a
-
-Would you be open to a brief chat about any full-time or internship engineering roles on your team?
-
-Best regards,
+Best,
 Keval Ambani
-+91-7439459385`,
++91-7439459385
+LinkedIn: https://www.linkedin.com/in/keval-ambani-9ba99532a
+GitHub: https://github.com/Keval4002`,
       },
       {
-        subject: "Re: Exploring Engineering Opportunities at {company}",
+        subject: "",
         body: `Hi {name},
 
-Just bumping this up in case it got buried. Totally understand how busy things get!
+Just bumping this up in case it got buried. I know how busy things get!
 
-I'm still very interested in contributing to {company}. To give you a quick sense of what I bring:
-my most recent project, VyapaarSetu, is an AI agent I built using LangGraph + FastMCP that's actively running for 2 businesses in India, automating their lead qualification, invoicing and scheduling end-to-end and cutting operational effort by 70%+.
+I'm still very interested in contributing to {company}. As I mentioned in my application, my most recent project is an AI agent I built using LangGraph + FastMCP that's actively running for 2 businesses in India, cutting operational effort by 70%+.
 
-I'm confident I can ship fast and deliver real impact from day one.
-
-Would a 15-minute call this week work for you?
+I'm confident I can ship fast and deliver real impact from day one. Would you be open to discussing the opportunities?
 
 Best,
 Keval Ambani
@@ -56,14 +51,18 @@ Keval Ambani
         subject: "",
         body: `Hi {name},
 
-I'll keep this short. I figure now probably isn't the right time, and I don't want to clog your inbox.
+Just following up on my application and previous notes.
 
-I'll stop following up here. But if you're ever looking for an engineer who can move fast, ship real products, and build intelligently with modern AI tools, feel free to reach back out. I'd love to be useful to your team when the timing is right.
+I know things might be busy on your end, but I'm still very keen on exploring engineering roles at {company}. I've had the chance to work across the stack—from building AI/agent workflows and backend systems to shipping customer-facing web products.
 
-Thanks for your time.
+I'd be glad to go through the standard interview process and demonstrate how my background aligns with your engineering needs.
 
+Would it be possible to connect for an interview opportunity?
+
+Best,
 Keval Ambani
-LinkedIn: https://www.linkedin.com/in/keval-ambani-9ba99532a | GitHub: https://github.com/Keval4002`,
++91-7439459385
+LinkedIn: https://www.linkedin.com/in/keval-ambani-9ba99532a`,
       },
     ],
   },
@@ -90,10 +89,44 @@ function StepBadge({ day, label, color }) {
 function CampaignBuilderContent() {
   const searchParams = useSearchParams();
 
+  // ── helper: format a Date to datetime-local string (local time) ──
+  const toLocalDT = (d) => {
+    const pad = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  // ── default: tomorrow at 09:00 ──
+  const defaultDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    return toLocalDT(d);
+  };
+
+  const DATE_PRESETS = [
+    {
+      id: "tonight",
+      label: "Tonight 7 pm",
+      compute: () => { const d = new Date(); d.setHours(19,0,0,0); return toLocalDT(d); },
+    },
+    {
+      id: "tomorrow",
+      label: "Tomorrow 9 am",
+      compute: () => { const d = new Date(); d.setDate(d.getDate()+1); d.setHours(9,0,0,0); return toLocalDT(d); },
+    },
+    {
+      id: "dayafter",
+      label: "Day after 9 am",
+      compute: () => { const d = new Date(); d.setDate(d.getDate()+2); d.setHours(9,0,0,0); return toLocalDT(d); },
+    },
+    { id: "custom", label: "Custom…", compute: null },
+  ];
+
   const [contacts,        setContacts]        = useState([]);
   const [includeFollowups,setIncludeFollowups]= useState(true);
   const [attachResume,    setAttachResume]    = useState(true);
-  const [startDate,       setStartDate]       = useState("");
+  const [startDate,       setStartDate]       = useState(defaultDate);
+  const [activePreset,    setActivePreset]    = useState("tomorrow");
   const [sequence,        setSequence]        = useState([
     { subject: TEMPLATES.generic_full_time.steps[0].subject, body: TEMPLATES.generic_full_time.steps[0].body },
     { subject: TEMPLATES.generic_full_time.steps[1].subject, body: TEMPLATES.generic_full_time.steps[1].body },
@@ -101,6 +134,71 @@ function CampaignBuilderContent() {
   ]);
   const [loading, setLoading] = useState(false);
   const [result,  setResult]  = useState(null);
+
+  const applyPreset = (preset) => {
+    setActivePreset(preset.id);
+    if (preset.compute) setStartDate(preset.compute());
+  };
+
+  const [bulkText, setBulkText] = useState("");
+  const [showBulk, setShowBulk] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+
+  const renderPreview = (text) => {
+    if (!previewMode) return text;
+    const c = contacts.find(x => x.email) || contacts[0] || { name: "John", company: "Acme Corp" };
+    let n = (c.name || "").split(" ")[0];
+    if (!n) n = "there";
+    let comp = c.company || "your team";
+    return text.replace(/{name}/g, n).replace(/{company}/g, comp);
+  };
+
+  const handleBulkImport = () => {
+    if (!bulkText.trim()) {
+      setShowBulk(false);
+      return;
+    }
+    const lines = bulkText.split('\n').map(l => l.trim()).filter(Boolean);
+    const newContacts = [];
+    for (const line of lines) {
+      const parts = line.split(/\t/).map(p => p.trim());
+      if (parts.length > 1) {
+        let email = "", name = "", company = "", title = "";
+        parts.forEach(p => {
+          if (p.includes("@") && p.includes(".")) email = p;
+          else if (!name && p.length < 30) name = p;
+          else if (!title && p.toLowerCase().match(/(engineer|manager|director|head|talent|recruiter)/)) title = p;
+          else if (!company && p.length < 40) company = p;
+        });
+        if (email || name) newContacts.push({ email, name, company, title });
+      } else {
+        const cparts = line.split(',').map(p => p.trim());
+        if (cparts.length > 1) {
+          let email = "", name = "", company = "", title = "";
+          cparts.forEach(p => {
+            if (p.includes("@") && p.includes(".")) email = p;
+            else if (!name && p.length < 30) name = p;
+            else if (!title && p.toLowerCase().match(/(engineer|manager|director|head|talent|recruiter)/)) title = p;
+            else if (!company && p.length < 40) company = p;
+          });
+          if (email || name) newContacts.push({ email, name, company, title });
+        } else {
+          if (line.includes("@")) newContacts.push({ email: line, name: "", company: "", title: "" });
+          else newContacts.push({ email: "", name: line, company: "", title: "" });
+        }
+      }
+    }
+    if (newContacts.length > 0) {
+      // Avoid overwriting if they opened the URL with a specific contact query param
+      if (contacts.length === 1 && !contacts[0].email && !contacts[0].name && !contacts[0].company) {
+        setContacts(newContacts);
+      } else {
+        setContacts([...contacts, ...newContacts]);
+      }
+    }
+    setBulkText("");
+    setShowBulk(false);
+  };
 
   useEffect(() => {
     const company  = searchParams.get("company");
@@ -131,6 +229,11 @@ function CampaignBuilderContent() {
     }
     if (!startDate) {
       setResult({ type: "error", message: "Send date is required." });
+      return;
+    }
+    // Validate send time is not in the past (allow 1-min buffer)
+    if (new Date(startDate) < new Date(Date.now() - 60000)) {
+      setResult({ type: "error", message: "Send date cannot be in the past." });
       return;
     }
     setLoading(true);
@@ -209,29 +312,56 @@ function CampaignBuilderContent() {
                   <p className="text-text-subtle text-xs mt-0.5">Who will receive this campaign.</p>
                 </div>
               </div>
-              <button type="button" onClick={addContact} className="btn-ghost !px-3 !py-1.5 !text-xs !min-h-[30px] shrink-0">
-                <Plus size={13} /> Add
-              </button>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setShowBulk(!showBulk)} className="btn-ghost !px-3 !py-1.5 !text-xs !min-h-[30px] shrink-0">
+                  Bulk Paste
+                </button>
+                <button type="button" onClick={addContact} className="btn-ghost !px-3 !py-1.5 !text-xs !min-h-[30px] shrink-0">
+                  <Plus size={13} /> Row
+                </button>
+              </div>
             </div>
 
-            <div className="px-5">
+            {showBulk && (
+              <div className="p-4 border-b border-border bg-neutral-soft">
+                <textarea
+                  className="w-full h-32 text-xs font-mono p-3 rounded-lg border border-border bg-surface"
+                  placeholder="Paste rows from Excel, Sheets, or LinkedIn here...&#10;Format: Name [tab] Title [tab] Company [tab] Email"
+                  value={bulkText}
+                  onChange={e => setBulkText(e.target.value)}
+                />
+                <div className="flex justify-end gap-2 mt-2">
+                  <button type="button" onClick={() => setShowBulk(false)} className="btn-ghost !px-3 !py-1.5 !text-xs">Cancel</button>
+                  <button type="button" onClick={handleBulkImport} className="btn-primary !px-3 !py-1.5 !text-xs">Import</button>
+                </div>
+              </div>
+            )}
+
+            <div className="px-5 max-h-[600px] overflow-y-auto">
               {contacts.length === 0 ? (
-                <div className="text-text-subtle text-sm text-center py-10">No contacts yet. Click <b>+ Add</b> to begin.</div>
+                <div className="text-text-subtle text-sm text-center py-10">No contacts yet. Click <b>Bulk Paste</b> or <b>+ Row</b> to begin.</div>
               ) : (
-                contacts.map((c, i) => (
-                  <div key={i} className="group relative grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 py-4 border-b border-border last:border-0">
-                    <div className="col-span-2 flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Contact {i + 1}</span>
-                      <button type="button" onClick={() => removeContact(i)} className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:bg-danger-soft hover:text-danger opacity-0 group-hover:opacity-100 transition-all">
-                        <X size={13} />
-                      </button>
+                <>
+                  {contacts.map((c, i) => (
+                    <div key={i} className="group relative grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 py-4 border-b border-border">
+                      <div className="col-span-2 flex items-center justify-between mb-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Contact {i + 1}</span>
+                        <button type="button" onClick={() => removeContact(i)} className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:bg-danger-soft hover:text-danger opacity-0 group-hover:opacity-100 transition-all">
+                          <X size={13} />
+                        </button>
+                      </div>
+                      <input type="email" placeholder="Email *" required className="col-span-2" value={c.email} onChange={e => updateContact(i, "email", e.target.value)} />
+                      <input type="text" placeholder="First Name" value={c.name} onChange={e => updateContact(i, "name", e.target.value)} />
+                      <input type="text" placeholder="Company" value={c.company} onChange={e => updateContact(i, "company", e.target.value)} />
+                      <input type="text" placeholder="Title" className="col-span-2" value={c.title} onChange={e => updateContact(i, "title", e.target.value)} />
                     </div>
-                    <input type="email" placeholder="Email *" required className="col-span-2" value={c.email} onChange={e => updateContact(i, "email", e.target.value)} />
-                    <input type="text" placeholder="First Name" value={c.name} onChange={e => updateContact(i, "name", e.target.value)} />
-                    <input type="text" placeholder="Company" value={c.company} onChange={e => updateContact(i, "company", e.target.value)} />
-                    <input type="text" placeholder="Title" className="col-span-2" value={c.title} onChange={e => updateContact(i, "title", e.target.value)} />
+                  ))}
+                  <div className="py-4 flex justify-center">
+                    <button type="button" onClick={addContact} className="btn-ghost !px-4 !py-2 !text-xs">
+                      <Plus size={14} className="mr-1.5" /> Add Row
+                    </button>
                   </div>
-                ))
+                </>
               )}
             </div>
 
@@ -262,14 +392,25 @@ function CampaignBuilderContent() {
                   </p>
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer shrink-0">
-                <div className="relative">
-                  <input type="checkbox" className="sr-only peer" checked={includeFollowups} onChange={e => setIncludeFollowups(e.target.checked)} />
-                  <div className="w-8 h-4 bg-neutral-soft rounded-full border border-border peer-checked:border-[#7c6dff] peer-checked:bg-[rgba(124,109,255,0.2)] transition-all" />
-                  <div className="absolute top-0.5 left-0.5 w-3 h-3 bg-text-subtle rounded-full peer-checked:translate-x-4 peer-checked:bg-[#7c6dff] transition-all" />
-                </div>
-                Follow-ups
-              </label>
+              <div className="flex items-center gap-4 shrink-0">
+                <label className="flex items-center gap-2 text-xs font-semibold text-text-main cursor-pointer">
+                  <div className="relative">
+                    <input type="checkbox" className="sr-only peer" checked={previewMode} onChange={e => setPreviewMode(e.target.checked)} />
+                    <div className="w-8 h-4 bg-neutral-soft rounded-full border border-border peer-checked:border-[#22d3ee] peer-checked:bg-[rgba(34,211,238,0.2)] transition-all" />
+                    <div className="absolute top-0.5 left-0.5 w-3 h-3 bg-text-subtle rounded-full peer-checked:translate-x-4 peer-checked:bg-[#22d3ee] transition-all" />
+                  </div>
+                  Live Preview
+                </label>
+                <div className="w-px h-4 bg-border" />
+                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer">
+                  <div className="relative">
+                    <input type="checkbox" className="sr-only peer" checked={includeFollowups} onChange={e => setIncludeFollowups(e.target.checked)} />
+                    <div className="w-8 h-4 bg-neutral-soft rounded-full border border-border peer-checked:border-[#7c6dff] peer-checked:bg-[rgba(124,109,255,0.2)] transition-all" />
+                    <div className="absolute top-0.5 left-0.5 w-3 h-3 bg-text-subtle rounded-full peer-checked:translate-x-4 peer-checked:bg-[#7c6dff] transition-all" />
+                  </div>
+                  Follow-ups
+                </label>
+              </div>
             </div>
 
             <div className="p-5 flex flex-col gap-0">
@@ -282,19 +423,71 @@ function CampaignBuilderContent() {
                   <div className="flex items-center flex-wrap gap-3 mb-4">
                     <StepBadge day="Day 0" color="purple" />
                     <span className="font-semibold text-sm text-text-main">First Email</span>
-                    <div className="ml-auto flex flex-col gap-1">
-                      <span className="text-xs text-text-subtle">Send at (IST)</span>
-                      <input type="datetime-local" required value={startDate} onChange={e => setStartDate(e.target.value)} className="!py-1.5 !text-xs" />
+                    <div className="ml-auto flex flex-col gap-1.5 items-end">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Send at (IST)</span>
+                      {/* Quick preset chips */}
+                      <div className="flex flex-wrap gap-1.5 justify-end">
+                        {DATE_PRESETS.map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => applyPreset(p)}
+                            className="text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all"
+                            style={{
+                              background: activePreset === p.id ? "rgba(124,109,255,0.18)" : "var(--neutral-soft)",
+                              borderColor: activePreset === p.id ? "rgba(124,109,255,0.5)" : "var(--border)",
+                              color: activePreset === p.id ? "#7c6dff" : "var(--text-subtle)",
+                              boxShadow: activePreset === p.id ? "0 0 8px rgba(124,109,255,0.25)" : "none",
+                            }}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Custom datetime picker — shown when Custom is selected */}
+                      {activePreset === "custom" && (
+                        <input
+                          type="datetime-local"
+                          required
+                          value={startDate}
+                          onChange={e => setStartDate(e.target.value)}
+                          className="!py-1.5 !text-xs mt-0.5"
+                        />
+                      )}
+                      {activePreset !== "custom" && startDate && (
+                        <div className="text-[10px] text-[#7c6dff] font-mono font-bold">
+                          {new Date(startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 mb-3">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Subject</label>
-                    <input type="text" value={sequence[0].subject} onChange={e => updateStep(0, "subject", e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Body</label>
-                    <textarea value={sequence[0].body} onChange={e => updateStep(0, "body", e.target.value)} rows={10} className="resize-y" />
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Subject"
+                    className="mb-3 font-semibold !text-sm !py-2 !px-3"
+                    value={sequence[0].subject}
+                    onChange={e => updateStep(0, "subject", e.target.value)}
+                    style={{ display: previewMode ? 'none' : 'block' }}
+                  />
+                  {previewMode && (
+                    <div className="mb-3 font-semibold text-sm py-2 px-3 border border-transparent bg-neutral-soft rounded-lg text-text-main">
+                      {renderPreview(sequence[0].subject)}
+                    </div>
+                  )}
+                  <textarea
+                    required
+                    placeholder="Email body..."
+                    className="min-h-[220px] !text-sm !py-3 !px-3 leading-relaxed"
+                    value={sequence[0].body}
+                    onChange={e => updateStep(0, "body", e.target.value)}
+                    style={{ display: previewMode ? 'none' : 'block' }}
+                  />
+                  {previewMode && (
+                    <div className="min-h-[220px] text-sm py-3 px-3 border border-transparent bg-neutral-soft rounded-lg text-text-main whitespace-pre-wrap leading-relaxed">
+                      {renderPreview(sequence[0].body)}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -305,19 +498,41 @@ function CampaignBuilderContent() {
                     style={{ border: "2.5px solid #3b9eff", background: "var(--surface)", boxShadow: "0 0 10px rgba(59,158,255,0.4)" }} />
                   <div className="min-w-0 border border-border rounded-xl p-5 mb-6 hover:border-[rgba(59,158,255,0.3)] transition-all"
                     style={{ background: "var(--surface)" }}>
-                    <div className="flex items-center flex-wrap gap-3 mb-4">
+                    <div className="flex items-center gap-3 mb-4">
                       <StepBadge day="Day 3" color="blue" />
                       <span className="font-semibold text-sm text-text-main">Follow-up 1</span>
-                      <span className="text-xs text-text-subtle ml-auto">Auto-scheduled 3 days after</span>
                     </div>
-                    <div className="flex flex-col gap-1.5 mb-3">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Subject <span className="normal-case font-normal">(leave blank to reply in thread)</span></label>
-                      <input type="text" value={sequence[1].subject} onChange={e => updateStep(1, "subject", e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Body</label>
-                      <textarea value={sequence[1].body} onChange={e => updateStep(1, "body", e.target.value)} rows={8} className="resize-y" />
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="Subject (leave blank to reply in same thread)"
+                      className="mb-3 font-semibold !text-sm !py-2 !px-3"
+                      value={sequence[1].subject}
+                      onChange={e => updateStep(1, "subject", e.target.value)}
+                      style={{ display: previewMode ? 'none' : 'block' }}
+                    />
+                    {previewMode && sequence[1].subject && (
+                      <div className="mb-3 font-semibold text-sm py-2 px-3 border border-transparent bg-neutral-soft rounded-lg text-text-main">
+                        {renderPreview(sequence[1].subject)}
+                      </div>
+                    )}
+                    {previewMode && !sequence[1].subject && (
+                      <div className="mb-3 font-semibold text-sm py-2 px-3 border border-transparent bg-[rgba(34,211,238,0.1)] rounded-lg text-[#22d3ee]">
+                        ↳ Replies to previous thread
+                      </div>
+                    )}
+                    <textarea
+                      required
+                      placeholder="Email body..."
+                      className="min-h-[160px] !text-sm !py-3 !px-3 leading-relaxed"
+                      value={sequence[1].body}
+                      onChange={e => updateStep(1, "body", e.target.value)}
+                      style={{ display: previewMode ? 'none' : 'block' }}
+                    />
+                    {previewMode && (
+                      <div className="min-h-[160px] text-sm py-3 px-3 border border-transparent bg-neutral-soft rounded-lg text-text-main whitespace-pre-wrap leading-relaxed">
+                        {renderPreview(sequence[1].body)}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -332,16 +547,38 @@ function CampaignBuilderContent() {
                     <div className="flex items-center flex-wrap gap-3 mb-4">
                       <StepBadge day="Day 8" color="muted" />
                       <span className="font-semibold text-sm text-text-main">Follow-up 2 <span className="text-text-subtle font-normal">(Breakup)</span></span>
-                      <span className="text-xs text-text-subtle ml-auto">Auto-scheduled 8 days after</span>
                     </div>
-                    <div className="flex flex-col gap-1.5 mb-3">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Subject <span className="normal-case font-normal">(leave blank to reply in thread)</span></label>
-                      <input type="text" value={sequence[2].subject} onChange={e => updateStep(2, "subject", e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-subtle">Body</label>
-                      <textarea value={sequence[2].body} onChange={e => updateStep(2, "body", e.target.value)} rows={8} className="resize-y" />
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="Subject (leave blank to reply in same thread)"
+                      className="mb-3 font-semibold !text-sm !py-2 !px-3"
+                      value={sequence[2].subject}
+                      onChange={e => updateStep(2, "subject", e.target.value)}
+                      style={{ display: previewMode ? 'none' : 'block' }}
+                    />
+                    {previewMode && sequence[2].subject && (
+                      <div className="mb-3 font-semibold text-sm py-2 px-3 border border-transparent bg-neutral-soft rounded-lg text-text-main">
+                        {renderPreview(sequence[2].subject)}
+                      </div>
+                    )}
+                    {previewMode && !sequence[2].subject && (
+                      <div className="mb-3 font-semibold text-sm py-2 px-3 border border-transparent bg-[rgba(34,211,238,0.1)] rounded-lg text-[#22d3ee]">
+                        ↳ Replies to previous thread
+                      </div>
+                    )}
+                    <textarea
+                      required
+                      placeholder="Email body..."
+                      className="min-h-[160px] !text-sm !py-3 !px-3 leading-relaxed"
+                      value={sequence[2].body}
+                      onChange={e => updateStep(2, "body", e.target.value)}
+                      style={{ display: previewMode ? 'none' : 'block' }}
+                    />
+                    {previewMode && (
+                      <div className="min-h-[160px] text-sm py-3 px-3 border border-transparent bg-neutral-soft rounded-lg text-text-main whitespace-pre-wrap leading-relaxed">
+                        {renderPreview(sequence[2].body)}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

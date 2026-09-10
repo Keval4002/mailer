@@ -53,7 +53,7 @@ echo ""
 # Start backend
 (
   cd "$BACKEND"
-  uv run uvicorn mail_scheduler.app:app --host 127.0.0.1 --port 8000 2>&1 \
+  uv run uvicorn mail_scheduler.app:app --host 127.0.0.1 --port 8000 --reload 2>&1 \
     | sed "s/^/$(printf '\033[0;36m')[backend]$(printf '\033[0m')  /"
 ) &
 BACKEND_PID=$!

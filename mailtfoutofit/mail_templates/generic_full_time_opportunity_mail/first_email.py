@@ -1,73 +1,57 @@
 def render_first_email(recipient_name: str, company: str, title: str = None) -> dict:
     name_str = recipient_name.split()[0] if recipient_name else "there"
-    company_str = company if company else "your team"
+    company_str = company if company else "your company"
 
-    subject = f"Exploring Engineering Opportunities at {company_str}"
+    subject = f"Application: Engineering Opportunities at {company_str} / Keval Ambani"
 
-    body_html = f"""
-    <p>Hi {name_str},</p>
+    body_html = f"""<p>Hi {name_str},</p>
 
-    <p>I hope you're doing well!</p>
+<p>I recently submitted my application for an engineering role at <b>{company_str}</b> and wanted to reach out directly to introduce myself.</p>
 
-    <p>I'm Keval Ambani, a Computer Engineering student at Thapar Institute of Engineering and Technology
-    (Batch 2027), and I'm reaching out because I'm genuinely excited about the engineering work happening at
-    <b>{company_str}</b>.</p>
+<p>I'm Keval Ambani, a Computer Engineering student at Thapar Institute (2027). I'm reaching out because I've been building and shipping full-stack products with a strong focus on AI, and I'm very interested in the work your team is doing.</p>
 
-    <p>Some highlights from my recent work:</p>
-    <ul>
-      <li>Built <b>VyapaarSetu</b>, an AI agent using <b>LangGraph deep agents + FastMCP</b> that automates
-      lead qualification, invoicing, scheduling and order fulfillment for 2 active stores across India,
-      <b>reducing repetitive operational effort by 70%+</b>. Integrated WhatsApp Business, Google Calendar
-      and Razorpay through MCP-powered tool calling.</li>
-      <li>At <b>Neural Network Labs</b> (Full Stack Intern), built AI-powered presentation generation workflows
-      using Gemini and async workers, reducing creation time to under 120 seconds and contributing to
-      <b>20%+ growth in trial adoption</b>.</li>
-      <li>Freelanced at <b>GlassFactory</b> building a Tariff Calculator and implementing adaptive bitrate
-      streaming via AWS MediaConvert for a global B2B marketplace.</li>
-    </ul>
+<p>To give you a quick sense of my background:</p>
+<ul>
+  <li>I built an AI business-automation agent running for 2 businesses.</li>
+  <li>I built a timetable platform used by 10,000+ students.</li>
+  <li>During my internship at Neural Network Labs, I built AI-powered presentation workflows.</li>
+  <li>I've also worked as a freelance developer on a global B2B marketplace and production web projects.</li>
+</ul>
 
-    <p>My stack: <b>React, Next.js, Node.js, FastAPI, LangGraph, Python, PostgreSQL, Docker</b>, and
-    I'm actively building with agentic AI tools.</p>
+<p>I'm particularly interested in software engineering roles where I can work close to the product and build things end-to-end, whether that's an internship now or a full-time role after I graduate in 2027.</p>
 
-    <p>You can explore my work here:
-    <a href="https://github.com/Keval4002">GitHub</a> |
-    <a href="https://www.linkedin.com/in/keval-ambani-9ba99532a">LinkedIn</a>
-    </p>
+<p><b>Would you be open to a brief conversation about any upcoming engineering opportunities at {company_str}?</b></p>
 
-    <p><b>Would you be open to a brief chat about any full-time or internship engineering roles on your team?</b></p>
-
-    <p>Best regards,<br>
-    Keval Ambani<br>
-    +91-7439459385</p>
-    """
+<p>Best,<br>
+Keval Ambani<br>
++91-7439459385<br>
+<a href="https://www.linkedin.com/in/keval-ambani-9ba99532a">LinkedIn</a> |
+<a href="https://github.com/Keval4002">GitHub</a></p>"""
 
     body_text = f"""Hi {name_str},
 
-I hope you're doing well!
+I recently submitted my application for an engineering role at {company_str} and wanted to reach out directly to introduce myself.
 
-I'm Keval Ambani, a Computer Engineering student at Thapar Institute of Engineering and Technology (Batch 2027), and I'm reaching out because I'm genuinely excited about the engineering work happening at {company_str}.
+I'm Keval Ambani, a Computer Engineering student at Thapar Institute (2027). I'm reaching out because I've been building and shipping full-stack products with a strong focus on AI, and I'm very interested in the work your team is doing.
 
-Some highlights from my recent work:
+To give you a quick sense of my background:
+- I built an AI business-automation agent running for 2 businesses.
+- I built a timetable platform used by 10,000+ students.
+- During my internship at Neural Network Labs, I built AI-powered presentation workflows.
+- I've also worked as a freelance developer on a global B2B marketplace and production web projects.
 
-- Built VyapaarSetu, an AI agent using LangGraph deep agents + FastMCP that automates lead qualification, invoicing, scheduling and order fulfillment for 2 active stores across India, reducing repetitive operational effort by 70%+. Integrated WhatsApp Business, Google Calendar and Razorpay through MCP-powered tool calling.
-- At Neural Network Labs (Full Stack Intern), built AI-powered presentation generation workflows using Gemini and async workers, reducing creation time to under 120 seconds and contributing to 20%+ growth in trial adoption.
-- Freelanced at GlassFactory building a Tariff Calculator and implementing adaptive bitrate streaming via AWS MediaConvert for a global B2B marketplace.
+I'm particularly interested in software engineering roles where I can work close to the product and build things end-to-end, whether that's an internship now or a full-time role after I graduate in 2027.
 
-My stack: React, Next.js, Node.js, FastAPI, LangGraph, Python, PostgreSQL, Docker, and I'm actively building with agentic AI tools.
+Would you be open to a brief conversation about any upcoming engineering opportunities at {company_str}?
 
-You can explore my work here:
-- GitHub: https://github.com/Keval4002
-- LinkedIn: https://www.linkedin.com/in/keval-ambani-9ba99532a
-
-Would you be open to a brief chat about any full-time or internship engineering roles on your team?
-
-Best regards,
+Best,
 Keval Ambani
 +91-7439459385
-"""
+LinkedIn: https://www.linkedin.com/in/keval-ambani-9ba99532a
+GitHub: https://github.com/Keval4002"""
 
     return {
         "subject": subject,
         "body_html": body_html.strip(),
-        "body_text": body_text.strip()
+        "body_text": body_text.strip(),
     }

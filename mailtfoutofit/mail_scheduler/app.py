@@ -366,6 +366,15 @@ def create_app(settings: Optional[Settings] = None):
         app.state.service = service
         app.state.scheduler_task = None
         app.state.gmail_oauth_states = {}
+        # On startup, any overdue pending jobs (e.g. from missing the 9am window)
+        # will simply be caught by the scheduler_loop and sent immediately.
+        # Hand off any pending jobs due in the next 24 h to Gmail Scheduled Send
+        try:
+            pushed = service.push_upcoming_jobs_to_gmail()
+            if pushed:
+                print(f"[Startup] {pushed} job(s) handed off to Gmail Scheduled Send.")
+        except Exception as exc:
+            print(f"[Startup] push_upcoming_jobs_to_gmail failed: {exc}")
         if resolved_settings.scheduler_enabled:
             app.state.scheduler_task = asyncio.create_task(scheduler_loop())
         try:
@@ -669,6 +678,27 @@ def create_app(settings: Optional[Settings] = None):
     async def get_contact(contact_id: str):
         return service.get_contact(contact_id)
 
+    @app.get("/api/contacts/{contact_id}/jobs", dependencies=[Depends(require_api_token)])
+    async def get_contact_jobs(contact_id: str):
+        with service.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, subject, body_text, scheduled_at, status, sent_at, parent_job_id, root_job_id,
+                       gmail_draft_id, gmail_scheduled_at
+                FROM mail_jobs
+                WHERE contact_id = ?
+                ORDER BY scheduled_at ASC
+                """,
+                (contact_id,),
+            ).fetchall()
+            jobs = [dict(r) for r in rows]
+        return {"jobs": jobs}
+
+    @app.post("/api/contacts/{contact_id}/mark-replied", dependencies=[Depends(require_api_token)])
+    async def mark_contact_replied(contact_id: str):
+        result = service.mark_contact_replied(contact_id)
+        return result
+
     @app.post("/api/mail-jobs/bulk", dependencies=[Depends(require_api_token)])
     async def create_bulk_mail_jobs(payload: BulkMailJobCreate):
         return service.create_mail_jobs(payload.batch_name, [job.model_dump() for job in payload.jobs])
@@ -788,9 +818,29 @@ def create_app(settings: Optional[Settings] = None):
         status: Optional[str] = None
         notes: Optional[str] = None
 
+    @app.get("/api/applications/boards", dependencies=[Depends(require_api_token)])
+    async def get_application_boards():
+        return {"boards": service.list_job_applications_boards()}
+
     @app.get("/api/applications", dependencies=[Depends(require_api_token)])
-    async def get_applications():
-        return {"applications": service.list_job_applications()}
+    async def get_applications(
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        job_board: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        sort: str = "newest",
+    ):
+        return {
+            "applications": service.list_job_applications(
+                search=search,
+                status=status,
+                job_board=job_board,
+                date_from=date_from,
+                date_to=date_to,
+                sort=sort,
+            )
+        }
 
     @app.post("/api/applications", dependencies=[Depends(require_api_token)])
     async def create_application(payload: JobApplicationCreate):
