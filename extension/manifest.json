@@ -25,6 +25,10 @@
     {
       "matches": [
         "https://*.linkedin.com/jobs/*",
+        "https://*.linkedin.com/messaging/*",
+        "https://*.linkedin.com/in/*",
+        "https://*.linkedin.com/mynetwork/*",
+        "https://*.linkedin.com/search/*",
         "https://*.indeed.com/viewjob*",
         "https://*.indeed.com/rc/clk*",
         "https://*.indeed.com/job/*",

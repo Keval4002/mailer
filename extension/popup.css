@@ -357,3 +357,452 @@ textarea { resize: none; line-height: 1.5; }
   border-color: var(--border-strong);
   color: var(--text-main);
 }
+
+.btn-sm {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+/* ── LinkedIn-blue paste button ── */
+:root {
+  --linkedin: #0a66c2;
+  --linkedin-hover: #0958a8;
+  --linkedin-glow: rgba(10, 102, 194, 0.35);
+}
+
+.btn-linkedin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #0a66c2 0%, #0756a8 100%);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4), 0 0 0 1px rgba(10,102,194,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+  transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+.btn-linkedin:hover {
+  background: linear-gradient(135deg, #1a76d2 0%, #1566b8 100%);
+  box-shadow: 0 4px 14px var(--linkedin-glow), 0 0 0 1px rgba(10,102,194,0.4);
+  transform: translateY(-1px);
+}
+
+.btn-linkedin:active  { transform: translateY(0); }
+.btn-linkedin:disabled,
+.btn-linkedin.is-loading {
+  opacity: 0.65; cursor: not-allowed; transform: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3); pointer-events: none;
+}
+
+/* ══════════════════════════════════════════
+   TAB BAR
+════════════════════════════════════════════ */
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  padding: 0 8px;
+}
+
+/* Accent top line */
+.tab-bar::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.5;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.tab-btn svg {
+  width: 13px; height: 13px; flex-shrink: 0;
+}
+
+.tab-btn:hover { color: var(--text-main); }
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  flex-shrink: 0;
+}
+
+/* ── Inline icon button (inside detected badge) ── */
+.icon-btn-inline {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none;
+  color: var(--success);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.icon-btn-inline:hover { background: rgba(46,170,101,0.15); }
+.icon-btn-inline svg { width: 12px; height: 12px; }
+
+/* ══════════════════════════════════════════
+   RECIPIENT CARD
+════════════════════════════════════════════ */
+
+.recipient-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(10,102,194,0.1) 0%, rgba(124,109,255,0.06) 100%);
+  border: 1px solid rgba(10,102,194,0.25);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+}
+
+.recipient-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.02);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.recipient-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0a66c2 0%, #7c6dff 100%);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(10,102,194,0.4);
+}
+
+.recipient-avatar svg { width: 20px; height: 20px; }
+.recipient-avatar.has-initials svg { display: none; }
+
+.recipient-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.recipient-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipient-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipient-company {
+  font-size: 11px;
+  color: var(--linkedin);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── No recipient state ── */
+.no-recipient-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 20px 10px;
+  text-align: center;
+  color: var(--text-subtle);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.no-recipient-state svg {
+  width: 36px; height: 36px;
+  color: var(--border-strong);
+}
+
+/* ── Matched application badge ── */
+.matched-app-badge,
+.no-app-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 16px 0;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.matched-app-badge {
+  background: rgba(46,170,101,0.12);
+  border: 1px solid rgba(46,170,101,0.25);
+  color: var(--success);
+}
+
+.matched-app-badge svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+.no-app-badge {
+  background: rgba(154,146,136,0.1);
+  border: 1px solid var(--border);
+  color: var(--text-subtle);
+}
+
+.no-app-badge svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════
+   MESSAGE TEMPLATE AREA
+════════════════════════════════════════════ */
+
+.msg-form-body {
+  padding-top: 10px;
+}
+
+.msg-template-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.template-hint-btn {
+  font-family: monospace;
+  font-size: 10px;
+  padding: 2px 7px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.template-hint-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Variables popover */
+.vars-popover {
+  position: absolute;
+  right: 16px;
+  z-index: 100;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
+  min-width: 210px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.vars-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.vars-popover-item code {
+  font-family: monospace;
+  color: var(--accent);
+  font-size: 11px;
+  background: var(--accent-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* Message preview box */
+.msg-preview {
+  padding: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 60px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+/* Message footer */
+.msg-footer {
+  gap: 6px;
+}
+
+/* ══════════════════════════════════════════
+   SETTINGS TAB
+════════════════════════════════════════════ */
+
+.settings-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 2px;
+  margin-top: 2px;
+}
+
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* ══════════════════════════════════════════
+   TEMPLATE PICKER PILLS (Message tab)
+════════════════════════════════════════════ */
+
+.template-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 2px 0 8px;
+  scrollbar-width: none;
+}
+.template-picker::-webkit-scrollbar { display: none; }
+
+.tmpl-pill {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 5px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.tmpl-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tmpl-pill.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+/* ══════════════════════════════════════════
+   SETTINGS TEMPLATE CARDS
+════════════════════════════════════════════ */
+
+.settings-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.settings-tmpl-card {
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-tmpl-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.settings-tmpl-card.is-active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(124,109,255,0.1) 0%, rgba(124,109,255,0.04) 100%);
+}
+
+.settings-tmpl-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-tmpl-desc {
+  font-size: 10.5px;
+  color: var(--text-subtle);
+  margin-top: 2px;
+}
+
+.active-pip {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(124,109,255,0.3);
+}
+
+

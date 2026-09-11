@@ -721,7 +721,173 @@
         sendResponse({ company: "", role: "", error: e.toString() });
       }
     }
+
+    if (request.action === "paste_linkedin_message") {
+      try {
+        pasteIntoLinkedInMessageBox(request.text);
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.toString() });
+      }
+    }
+
     return true;
   });
+
+  /* ──────────────────────────────────────────────
+     LINKEDIN MESSAGING ASSISTANT
+     Detects recipient info from LinkedIn messaging
+     contexts (dedicated page, overlay, InMail).
+  ────────────────────────────────────────────── */
+
+  (function linkedInMessagingAssistant() {
+    const isLinkedIn = () => window.location.hostname.includes("linkedin.com");
+    if (!isLinkedIn()) return;
+
+    /* ── Recipient selectors (ordered best→worst) ── */
+    const RECIPIENT_NAME_SELECTORS = [
+      // Dedicated messaging page — thread header
+      ".msg-thread__link-underline",
+      ".msg-s-message-list-container .msg-entity-lockup__entity-title",
+      // Messaging overlay (bottom-right bubble)
+      ".msg-overlay-conversation-bubble--active .msg-entity-lockup__entity-title",
+      ".msg-overlay-bubble-header__title",
+      // Profile page InMail / Connect modal
+      ".artdeco-modal .send-invite__headline",
+      ".artdeco-modal [data-test-modal-header-title]",
+      // Connection request modal
+      ".connect-button-send-invite__profile-info h2",
+      // Generic fallback — page h1 on /in/ profiles
+      ".pv-top-card--list .text-heading-xlarge",
+      ".ph5 h1",
+    ];
+
+    const RECIPIENT_SUBTITLE_SELECTORS = [
+      ".msg-entity-lockup__subtitle",
+      ".msg-overlay-conversation-bubble--active .msg-entity-lockup__subtitle",
+      ".pv-top-card--list .text-body-medium",
+      ".ph5 .text-body-medium",
+    ];
+
+    function scrapeLinkedInRecipient() {
+      let name = "";
+      for (const sel of RECIPIENT_NAME_SELECTORS) {
+        try {
+          const el = document.querySelector(sel);
+          const t  = elText(el);
+          if (t && t.length > 1) { name = t; break; }
+        } catch (_) {}
+      }
+
+      let subtitle = "";
+      for (const sel of RECIPIENT_SUBTITLE_SELECTORS) {
+        try {
+          const el = document.querySelector(sel);
+          const t  = elText(el);
+          if (t) { subtitle = t; break; }
+        } catch (_) {}
+      }
+
+      // Parse "Title at Company" from subtitle
+      let title   = "";
+      let company = "";
+      if (subtitle) {
+        const atMatch = subtitle.match(/^(.+?)\s+at\s+(.+)$/i);
+        if (atMatch) {
+          title   = cleanStr(atMatch[1]);
+          company = cleanStr(atMatch[2]);
+        } else {
+          title = subtitle;
+        }
+      }
+
+      const firstName = name ? name.trim().split(/\s+/)[0] : "";
+
+      return name ? { name, firstName, title, company } : null;
+    }
+
+    function pushRecipientToStorage(data) {
+      if (!data) return;
+      chrome.storage.local.set({ linkedinRecipient: { ...data, detectedAt: Date.now() } });
+    }
+
+    /* ── Paste into LinkedIn's contenteditable message box ── */
+    function pasteIntoLinkedInMessageBox(text) {
+      // Try multiple selectors for the active message composer
+      const COMPOSER_SELECTORS = [
+        // Messaging page
+        ".msg-form__contenteditable",
+        // Messaging overlay
+        ".msg-overlay-conversation-bubble--active .msg-form__contenteditable",
+        // InMail / send message modal
+        ".artdeco-modal .msg-form__contenteditable",
+        // Generic contenteditable inside any active compose area
+        "[data-artdeco-is-focused='true'] [contenteditable='true']",
+        "[contenteditable='true'][role='textbox']",
+      ];
+
+      let box = null;
+      for (const sel of COMPOSER_SELECTORS) {
+        try {
+          const el = document.querySelector(sel);
+          if (el) { box = el; break; }
+        } catch (_) {}
+      }
+
+      if (!box) throw new Error("LinkedIn message box not found on page.");
+
+      box.focus();
+      // Clear existing placeholder text (LinkedIn uses an empty <p> with class)
+      const existingP = box.querySelector("p");
+      if (existingP && existingP.textContent.trim() === "") {
+        existingP.remove();
+      }
+
+      // Insert using document.execCommand for broadest compatibility in content scripts
+      if (document.queryCommandSupported && document.queryCommandSupported("insertText")) {
+        document.execCommand("insertText", false, text);
+      } else {
+        // Fallback: set innerHTML directly and fire input event
+        box.textContent = text;
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      // Dispatch additional events LinkedIn listens to
+      box.dispatchEvent(new Event("input",  { bubbles: true }));
+      box.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // Expose paste handler globally so the message listener above can call it
+    window.__mailerPasteLinkedIn = pasteIntoLinkedInMessageBox;
+
+    /* ── Observe and push recipient continuously ── */
+    let lastRecipientName = "";
+    let recipientDebounce = null;
+
+    function scheduleRecipientScrape(delay = 600) {
+      clearTimeout(recipientDebounce);
+      recipientDebounce = setTimeout(() => {
+        const data = scrapeLinkedInRecipient();
+        if (data && data.name !== lastRecipientName) {
+          lastRecipientName = data.name;
+          pushRecipientToStorage(data);
+        }
+      }, delay);
+    }
+
+    // Initial scrape
+    scheduleRecipientScrape(1200);
+    scheduleRecipientScrape(3000);
+
+    // Re-scrape on any DOM change (conversation switches, modal opens)
+    const recipientObserver = new MutationObserver(() => scheduleRecipientScrape(500));
+    recipientObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Also re-scrape on SPA navigation
+    const origPushLI    = history.pushState.bind(history);
+    const origReplaceLI = history.replaceState.bind(history);
+    history.pushState    = (...a) => { origPushLI(...a);    scheduleRecipientScrape(1200); };
+    history.replaceState = (...a) => { origReplaceLI(...a); scheduleRecipientScrape(1200); };
+  })();
 
 })();

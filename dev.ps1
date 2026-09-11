@@ -1,20 +1,20 @@
-# dev.ps1 — Start backend + frontend for local development (Windows PowerShell)
+# dev.ps1 - Start backend + frontend for local development (Windows PowerShell)
 $ErrorActionPreference = "Stop"
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Personal Mail Scheduler — Dev Mode    " -ForegroundColor Cyan
+Write-Host "  Personal Mail Scheduler - Dev Mode    " -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not (Test-Path "$ScriptDir\mailtfoutofit\.env")) {
-    Write-Host "[backend] .env not found — copy .env.example and fill in secrets:" -ForegroundColor Red
+    Write-Host "[backend] .env not found - copy .env.example and fill in secrets:" -ForegroundColor Red
     Write-Host "  Copy-Item mailtfoutofit\.env.example mailtfoutofit\.env" -ForegroundColor Yellow
     exit 1
 }
 
 if (-not (Test-Path "$ScriptDir\frontend-next\.env.local")) {
-    Write-Host "[frontend] .env.local not found — creating from example..." -ForegroundColor Yellow
+    Write-Host "[frontend] .env.local not found - creating from example..." -ForegroundColor Yellow
     Copy-Item "$ScriptDir\frontend-next\.env.local.example" "$ScriptDir\frontend-next\.env.local"
 }
 

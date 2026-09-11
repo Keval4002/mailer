@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Mailer — Record Application</title>
+  <title>Mailer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -10,63 +10,36 @@
 </head>
 <body>
 
-  <!-- ── Settings View ── -->
-  <div id="settings-view" class="view hidden">
-    <div class="view-header">
-      <div class="brand">
-        <svg class="brand-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="4" width="16" height="12" rx="2"/>
-          <path d="M2 7L10 12L18 7"/>
-        </svg>
-        <span>Settings</span>
-      </div>
-    </div>
-
-    <div class="form-body">
-      <div class="field-group">
-        <label class="field-label">Backend API URL</label>
-        <input type="text" id="api-url" placeholder="http://127.0.0.1:8000" autocomplete="off" />
-      </div>
-      <div class="field-group">
-        <label class="field-label">API Token <span class="label-muted">(Bearer)</span></label>
-        <input type="password" id="api-token" placeholder="Paste your token here" />
-      </div>
-      <p class="help-text">Find your token in your Mailer dashboard settings.</p>
-    </div>
-
-    <div class="form-footer">
-      <button id="back-to-main-btn" class="btn-ghost">Cancel</button>
-      <button id="save-settings-btn" class="btn-primary">Save Settings</button>
-    </div>
+  <!-- ── Tab Bar ── -->
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" data-tab="main-view" id="tab-record">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="12" height="10" rx="1.5"/>
+        <path d="M2 6h12"/>
+        <path d="M5.5 9.5h5M5.5 11.5h3"/>
+      </svg>
+      Record
+    </button>
+    <button class="tab-btn" data-tab="message-view" id="tab-message">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 3h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5l-3 2V4a1 1 0 0 1 1-1z"/>
+      </svg>
+      Message
+      <span class="tab-dot hidden" id="tab-message-dot"></span>
+    </button>
+    <button class="tab-btn" data-tab="settings-view" id="tab-settings">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="2"/>
+        <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
+      </svg>
+      Settings
+    </button>
   </div>
 
-  <!-- ── Main View ── -->
+  <!-- ══════════════════════════════════════════
+       RECORD TAB (main view)
+  ══════════════════════════════════════════ -->
   <div id="main-view" class="view">
-
-    <!-- Header -->
-    <div class="view-header">
-      <div class="brand">
-        <svg class="brand-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="4" width="16" height="12" rx="2"/>
-          <path d="M2 7L10 12L18 7"/>
-        </svg>
-        <span>Mailer</span>
-      </div>
-      <div class="header-actions">
-        <button id="refresh-scrape-btn" class="icon-btn" title="Re-scan this page" aria-label="Refresh scrape">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 4a8 8 0 1 1 0 12"/>
-            <path d="M4 4v4h4"/>
-          </svg>
-        </button>
-        <button id="go-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="10" cy="10" r="2.5"/>
-            <path d="M10 2.5v1.2M10 16.3v1.2M2.5 10h1.2M16.3 10h1.2M4.4 4.4l.85.85M14.75 14.75l.85.85M4.4 15.6l.85-.85M14.75 5.25l.85-.85"/>
-          </svg>
-        </button>
-      </div>
-    </div>
 
     <!-- Auto-detected badge -->
     <div id="detected-badge" class="detected-badge hidden">
@@ -74,6 +47,11 @@
         <circle cx="8" cy="8" r="6"/><path d="M5.5 8l2 2 3-3"/>
       </svg>
       <span id="detected-text">Auto-filled from page</span>
+      <button id="refresh-scrape-btn" class="icon-btn-inline" title="Re-scan this page" aria-label="Refresh scrape">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3a6 6 0 1 1 0 10"/><path d="M3 3v3h3"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Form body -->
@@ -116,7 +94,7 @@
         </div>
       </div>
 
-      <!-- Row 3: Location + Salary (auto-filled when available) -->
+      <!-- Row 3: Location + Salary -->
       <div class="field-row">
         <div class="field-group">
           <label class="field-label">Location <span class="label-muted">(auto)</span></label>
@@ -124,14 +102,14 @@
         </div>
         <div class="field-group">
           <label class="field-label">Salary <span class="label-muted">(auto)</span></label>
-          <input type="text" id="salary" placeholder="e.g. ₹12 LPA" />
+          <input type="text" id="salary" placeholder="e.g. Rs. 12 LPA" />
         </div>
       </div>
 
       <!-- Notes -->
       <div class="field-group">
         <label class="field-label">Notes <span class="label-muted">(optional)</span></label>
-        <textarea id="notes" rows="2" placeholder="Any quick notes about this role…"></textarea>
+        <textarea id="notes" rows="2" placeholder="Any quick notes about this role..."></textarea>
       </div>
 
     </div>
@@ -151,6 +129,137 @@
           </svg>
         </span>
       </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       MESSAGE ASSISTANT TAB
+  ══════════════════════════════════════════ -->
+  <div id="message-view" class="view hidden">
+
+    <!-- Recipient card -->
+    <div id="recipient-card" class="recipient-card hidden">
+      <div class="recipient-avatar" id="recipient-avatar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+      </div>
+      <div class="recipient-info">
+        <div class="recipient-name" id="recipient-name">—</div>
+        <div class="recipient-title" id="recipient-title"></div>
+        <div class="recipient-company" id="recipient-company"></div>
+      </div>
+    </div>
+
+    <!-- No recipient state -->
+    <div id="no-recipient" class="no-recipient-state">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="8" width="32" height="24" rx="3"/>
+        <path d="M4 14l16 10 16-10"/>
+        <circle cx="30" cy="28" r="7" fill="#1e1c19" stroke-width="1.5"/>
+        <path d="M27 28h6M30 25v6"/>
+      </svg>
+      <p>Open a LinkedIn message or profile<br/>to detect the recipient automatically.</p>
+    </div>
+
+    <!-- Matched application pill -->
+    <div id="matched-app-badge" class="matched-app-badge hidden">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 7a6 6 0 1 0 12 0A6 6 0 0 0 1 7z"/>
+        <path d="M4.5 7l2 2 3-3"/>
+      </svg>
+      <span id="matched-app-text">Applied for — at —</span>
+    </div>
+
+    <!-- No application found pill -->
+    <div id="no-app-badge" class="no-app-badge hidden">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="7" cy="7" r="6"/><path d="M7 4v3.5M7 9.5v.5"/>
+      </svg>
+      <span>No application found for this company</span>
+    </div>
+
+    <!-- Message template editor -->
+    <div class="form-body msg-form-body">
+      <!-- Template preset picker -->
+      <div id="template-picker" class="template-picker"></div>
+
+      <div class="field-group">
+        <div class="msg-template-header">
+          <label class="field-label">Edit Template</label>
+          <button class="template-hint-btn" id="template-vars-hint" title="Available variables">
+            {vars}
+          </button>
+        </div>
+        <div id="template-vars-popover" class="vars-popover hidden">
+          <div class="vars-popover-item"><code>{first_name}</code> Recipient's first name</div>
+          <div class="vars-popover-item"><code>{name}</code> Recipient's full name</div>
+          <div class="vars-popover-item"><code>{role}</code> Role you applied for</div>
+          <div class="vars-popover-item"><code>{company}</code> Company name</div>
+          <div class="vars-popover-item"><code>{title}</code> Recipient's job title</div>
+        </div>
+        <textarea id="msg-template-editor" rows="5" placeholder="Write your template here..."></textarea>
+      </div>
+
+      <!-- Preview -->
+      <div class="field-group">
+        <label class="field-label">Preview</label>
+        <div id="msg-preview" class="msg-preview"></div>
+      </div>
+    </div>
+
+    <!-- Message tab footer -->
+    <div class="form-footer msg-footer">
+      <div id="msg-status" class="status-msg" role="alert"></div>
+      <button id="copy-msg-btn" class="btn-ghost btn-sm" title="Copy to clipboard">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M10 5V3.5A1.5 1.5 0 0 0 8.5 2h-5A1.5 1.5 0 0 0 2 3.5v5A1.5 1.5 0 0 0 3.5 10H5"/>
+        </svg>
+        Copy
+      </button>
+      <button id="paste-msg-btn" class="btn-linkedin btn-full">
+        <svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5l-3 2V4a1 1 0 0 1 1-1z"/>
+        </svg>
+        <span class="btn-label">Paste into LinkedIn</span>
+        <span class="btn-spinner hidden">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2z" opacity="0.2"/>
+            <path d="M10 2a8 8 0 0 1 8 8"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SETTINGS TAB
+  ══════════════════════════════════════════ -->
+  <div id="settings-view" class="view hidden">
+
+    <div class="form-body">
+      <div class="settings-section-title">API Connection</div>
+
+      <div class="field-group">
+        <label class="field-label">Backend API URL</label>
+        <input type="text" id="api-url" placeholder="http://127.0.0.1:8000" autocomplete="off" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">API Token <span class="label-muted">(Bearer)</span></label>
+        <input type="password" id="api-token" placeholder="Paste your token here" />
+      </div>
+      <p class="help-text">Find your token in your Mailer dashboard settings.</p>
+
+      <div class="settings-divider"></div>
+      <div class="settings-section-title">Message Templates <span class="label-muted" style="text-transform:none;letter-spacing:0;font-weight:400">(click to set active)</span></div>
+      <div id="settings-template-list" class="settings-template-list"></div>
+      <p class="help-text">Switch templates from here or from the Message tab. Edit the body in the Message tab editor.</p>
+    </div>
+
+    <div class="form-footer">
+      <div id="settings-status" class="status-msg" role="alert"></div>
+      <button id="save-settings-btn" class="btn-primary">Save Settings</button>
     </div>
   </div>
 
