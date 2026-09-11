@@ -683,8 +683,9 @@ def create_app(settings: Optional[Settings] = None):
         with service.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, subject, body_text, scheduled_at, status, sent_at, parent_job_id, root_job_id,
-                       gmail_draft_id, gmail_scheduled_at
+                SELECT id, subject, body_text, scheduled_at, status, sent_at, failed_at,
+                       parent_job_id, root_job_id, gmail_draft_id, gmail_scheduled_at,
+                       last_error, blocked_reason
                 FROM mail_jobs
                 WHERE contact_id = ?
                 ORDER BY scheduled_at ASC

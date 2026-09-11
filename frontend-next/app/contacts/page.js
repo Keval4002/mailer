@@ -87,13 +87,23 @@ function EmailTimeline({ jobs }) {
         const color = stepColors[i] || "#888";
         const isLast = i === jobs.length - 1;
         const isSent = job.status === "sent";
-        const isPending = job.status === "pending";
+        const isPending = job.status === "pending" || job.status === "gmail_scheduled";
+        const isFailed = job.status === "failed";
+        const isBlocked = job.status === "blocked";
+        const isCancelled = job.status === "cancelled";
+
+        let dotColor = "#555";
+        let dotGlow = "none";
+        if (isSent) dotColor = "#2eaa65";
+        else if (isPending) { dotColor = color; dotGlow = `0 0 6px ${color}80`; }
+        else if (isFailed) dotColor = "#e05050";
+        else if (isBlocked || isCancelled) dotColor = "#f5a623";
 
         return (
           <div key={job.id} className="flex gap-3">
             {/* timeline spine */}
             <div className="flex flex-col items-center shrink-0">
-              <div className="w-2 h-2 rounded-full mt-1 shrink-0" style={{ background: isSent ? "#2eaa65" : isPending ? color : "#555", boxShadow: isPending ? `0 0 6px ${color}80` : "none" }} />
+              <div className="w-2 h-2 rounded-full mt-1 shrink-0" style={{ background: dotColor, boxShadow: dotGlow }} />
               {!isLast && <div className="w-[1px] flex-1 my-1" style={{ background: "var(--border)" }} />}
             </div>
             {/* content */}
@@ -102,9 +112,14 @@ function EmailTimeline({ jobs }) {
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{stepLabels[i] || `Step ${i + 1}`}</span>
                 {isSent && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(46,170,101,0.1)", color: "#2eaa65" }}>Sent</span>}
                 {isPending && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{timeUntil(job.scheduled_at)}</span>}
+                {isFailed && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(224,80,80,0.1)", color: "#e05050" }}>Failed</span>}
+                {isBlocked && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(245,166,35,0.1)", color: "#f5a623" }}>Blocked</span>}
+                {isCancelled && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(245,166,35,0.1)", color: "#f5a623" }}>Cancelled</span>}
               </div>
               <div className="text-xs text-text-muted font-mono mt-0.5">{fmtDate(job.scheduled_at)}</div>
               {job.subject && <div className="text-[11px] text-text-subtle mt-0.5 truncate max-w-[280px]">{job.subject}</div>}
+              {isFailed && job.last_error && <div className="text-[11px] text-[#e05050] mt-1 italic max-w-[280px] truncate" title={job.last_error}>{job.last_error}</div>}
+              {isBlocked && job.blocked_reason && <div className="text-[11px] text-[#f5a623] mt-1 italic max-w-[280px] truncate" title={job.blocked_reason}>Reason: {job.blocked_reason.replace(/_/g, ' ')}</div>}
             </div>
           </div>
         );
