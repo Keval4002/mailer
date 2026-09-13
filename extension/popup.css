@@ -806,3 +806,35 @@ textarea { resize: none; line-height: 1.5; }
 }
 
 
+/* ══════════════════════════════════════════
+   PREVIEW VAR RESOLUTION FEEDBACK
+════════════════════════════════════════════ */
+
+/* Warning border when {vars} still unresolved */
+.msg-preview.has-unresolved {
+  border-color: rgba(224, 160, 50, 0.45);
+  box-shadow: 0 0 0 2px rgba(224, 160, 50, 0.15);
+}
+
+/* Amber hint text below preview */
+.preview-hint {
+  font-size: 10.5px;
+  color: #c98a20;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(224, 160, 50, 0.08);
+  border: 1px solid rgba(224, 160, 50, 0.2);
+  border-radius: 5px;
+  line-height: 1.5;
+}
+
+/* Green "✓ All vars resolved" badge */
+.preview-resolved {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--success);
+  background: var(--success-soft);
+  border: 1px solid rgba(46, 170, 101, 0.25);
+  padding: 2px 7px;
+  border-radius: 20px;
+}

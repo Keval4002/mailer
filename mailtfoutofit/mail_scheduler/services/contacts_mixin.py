@@ -623,6 +623,42 @@ class ContactsMixin:
 
         return {"contact_id": contact_id, "cancelled_jobs": len(cancelled_jobs)}
 
+    def cancel_contact_jobs(self, contact_id: str) -> Dict:
+        """Cancel all pending/gmail_scheduled mail jobs for a contact."""
+        now = to_storage_datetime(utc_now())
+        cancelled_jobs = []
+
+        with self.connect() as connection:
+            # Find all pending/gmail_scheduled jobs
+            rows = connection.execute(
+                """
+                SELECT id, status
+                FROM mail_jobs
+                WHERE contact_id = ?
+                  AND status IN ('pending', 'gmail_scheduled')
+                """,
+                (contact_id,),
+            ).fetchall()
+
+            for row in rows:
+                job_id = row["id"]
+                if row["status"] == "gmail_scheduled":
+                    self.cancel_gmail_draft_for_job(connection, job_id)
+                else:
+                    connection.execute(
+                        """
+                        UPDATE mail_jobs
+                        SET status = 'cancelled',
+                            blocked_reason = 'manual_cancellation',
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (now, job_id),
+                    )
+                cancelled_jobs.append(job_id)
+
+        return {"contact_id": contact_id, "cancelled_jobs": len(cancelled_jobs)}
+
     def _get_latest_active_resume(self, connection):
         return connection.execute(
             """

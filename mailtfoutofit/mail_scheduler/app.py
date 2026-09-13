@@ -311,6 +311,9 @@ class MailJobUpdate(BaseModel):
             raise ValueError("scheduled_at must include a timezone offset")
         return value
 
+class MailJobReschedule(BaseModel):
+    new_time: str
+
 
 def create_app(settings: Optional[Settings] = None):
     resolved_settings = settings or Settings.from_env()
@@ -700,6 +703,11 @@ def create_app(settings: Optional[Settings] = None):
         result = service.mark_contact_replied(contact_id)
         return result
 
+    @app.post("/api/contacts/{contact_id}/cancel-jobs", dependencies=[Depends(require_api_token)])
+    async def cancel_contact_jobs(contact_id: str):
+        result = service.cancel_contact_jobs(contact_id)
+        return result
+
     @app.post("/api/mail-jobs/bulk", dependencies=[Depends(require_api_token)])
     async def create_bulk_mail_jobs(payload: BulkMailJobCreate):
         return service.create_mail_jobs(payload.batch_name, [job.model_dump() for job in payload.jobs])
@@ -783,6 +791,10 @@ def create_app(settings: Optional[Settings] = None):
     @app.post("/api/mail-jobs/{job_id}/cancel", dependencies=[Depends(require_api_token)])
     async def api_cancel_job(job_id: str):
         return service.cancel_mail_job(job_id)
+
+    @app.post("/api/mail-jobs/{job_id}/reschedule", dependencies=[Depends(require_api_token)])
+    async def api_reschedule_job(job_id: str, payload: MailJobReschedule):
+        return service.reschedule_job(job_id, payload.new_time)
 
 
 

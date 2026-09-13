@@ -644,14 +644,19 @@
 
   function pushToStorage(result) {
     if (!result.company && !result.role) return; // nothing useful
-    chrome.storage.local.set({
-      scraped: {
-        ...result,
-        url:       window.location.href,
-        pageTitle: document.title,
-        scrapedAt: Date.now(),
-      }
-    });
+    try {
+      const p = chrome.storage.local.set({
+        scraped: {
+          ...result,
+          url:       window.location.href,
+          pageTitle: document.title,
+          scrapedAt: Date.now(),
+        }
+      });
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {
+      // Suppress synchronous context invalidated errors
+    }
   }
 
   /* ──────────────────────────────────────────────
@@ -723,11 +728,37 @@
     }
 
     if (request.action === "paste_linkedin_message") {
-      try {
-        pasteIntoLinkedInMessageBox(request.text);
-        sendResponse({ ok: true });
-      } catch (e) {
-        sendResponse({ ok: false, error: e.toString() });
+      // pasteIntoLinkedInMessageBox is scoped inside the IIFE below;
+      // use the window.__ namespace it exposes.
+      const pasteFn = window.__mailerPasteLinkedIn;
+      if (!pasteFn) {
+        sendResponse({ ok: false, error: "Paste handler not ready (not a LinkedIn page)." });
+      } else {
+        try {
+          pasteFn(request.text);
+          sendResponse({ ok: true });
+        } catch (e) {
+          sendResponse({ ok: false, error: e.toString() });
+        }
+      }
+    }
+
+    if (request.action === "get_linkedin_recipient") {
+      // scrapeLinkedInRecipient is also IIFE-scoped; use the exposed wrapper.
+      const scrapeFn = window.__mailerScrapeRecipient;
+      if (!scrapeFn) {
+        sendResponse({ recipient: null });
+      } else {
+        try {
+          const data = scrapeFn();
+          if (data) {
+            // Also persist it so storage.onChanged fires in the popup
+            chrome.storage.local.set({ linkedinRecipient: { ...data, detectedAt: Date.now() } });
+          }
+          sendResponse({ recipient: data });
+        } catch (e) {
+          sendResponse({ recipient: null, error: e.toString() });
+        }
       }
     }
 
@@ -744,11 +775,14 @@
     const isLinkedIn = () => window.location.hostname.includes("linkedin.com");
     if (!isLinkedIn()) return;
 
-    /* ── Recipient selectors (ordered best→worst) ── */
+    /* ── Recipient selectors (ordered best → worst) ── */
     const RECIPIENT_NAME_SELECTORS = [
       // Dedicated messaging page — thread header
       ".msg-thread__link-underline",
       ".msg-s-message-list-container .msg-entity-lockup__entity-title",
+      // InMail compose modal header (profile page)
+      ".artdeco-modal .msg-entity-lockup__entity-title",
+      ".artdeco-modal .pvs-header__title span[aria-hidden='true']",
       // Messaging overlay (bottom-right bubble)
       ".msg-overlay-conversation-bubble--active .msg-entity-lockup__entity-title",
       ".msg-overlay-bubble-header__title",
@@ -757,47 +791,132 @@
       ".artdeco-modal [data-test-modal-header-title]",
       // Connection request modal
       ".connect-button-send-invite__profile-info h2",
-      // Generic fallback — page h1 on /in/ profiles
-      ".pv-top-card--list .text-heading-xlarge",
-      ".ph5 h1",
+      
+      // Profile page h1 (scoped to intro card to avoid modal noise)
+      ".pv-text-details__left-panel h1",
+      "main .ph5 h1",
+      "section.artdeco-card h1.text-heading-xlarge",
+      ".pv-top-card-v2-ctas h1",
+      "[data-generated-suggestion-target] h1",
+      "h1.text-heading-xlarge",
+      "h1",
+      "h2",
     ];
 
     const RECIPIENT_SUBTITLE_SELECTORS = [
+      // Messaging modals / threads
       ".msg-entity-lockup__subtitle",
+      ".artdeco-modal .msg-entity-lockup__subtitle",
       ".msg-overlay-conversation-bubble--active .msg-entity-lockup__subtitle",
+      
+      // Profile page headline (scoped to intro card to avoid picking up "Add a note" modal text)
+      ".pv-text-details__left-panel .text-body-medium.break-words",
+      "main .ph5 .text-body-medium.break-words",
+      "section.artdeco-card .text-body-medium.break-words",
       ".pv-top-card--list .text-body-medium",
-      ".ph5 .text-body-medium",
+      "[data-generated-suggestion-target] .text-body-medium",
     ];
+
+    /** Extract name and headline directly from LinkedIn's internal JSON-based state hydration */
+    function parseLinkedInHydrationState() {
+      try {
+        const codeBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
+        for (const block of codeBlocks) {
+          try {
+            const raw = block.textContent.trim();
+            if (!raw.startsWith('{')) continue;
+            
+            const data = JSON.parse(raw);
+            if (data && Array.isArray(data.included)) {
+              for (const item of data.included) {
+                // Ensure we are reading the profile of the person we are currently viewing
+                const publicId = item.publicIdentifier;
+                if (!publicId || !window.location.href.includes(publicId)) continue;
+                
+                // Name might be nested localized object or a direct string depending on Voyager version
+                let fName = item.firstName || "";
+                let lName = item.lastName || "";
+                if (typeof fName === "object") fName = fName.text || fName.localized || ""; 
+                if (typeof lName === "object") lName = lName.text || lName.localized || "";
+                
+                let head = item.headline || "";
+                if (typeof head === "object") head = head.text || head.localized || "";
+
+                if (fName && head) {
+                  return {
+                    name: `${fName} ${lName}`.trim(),
+                    subtitle: head
+                  };
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+      return null;
+    }
 
     function scrapeLinkedInRecipient() {
       let name = "";
-      for (const sel of RECIPIENT_NAME_SELECTORS) {
-        try {
-          const el = document.querySelector(sel);
-          const t  = elText(el);
-          if (t && t.length > 1) { name = t; break; }
-        } catch (_) {}
-      }
-
       let subtitle = "";
-      for (const sel of RECIPIENT_SUBTITLE_SELECTORS) {
-        try {
-          const el = document.querySelector(sel);
-          const t  = elText(el);
-          if (t) { subtitle = t; break; }
-        } catch (_) {}
+
+      // 1. Try to pull structured data from hydration state (Bulletproof for profile pages)
+      if (window.location.href.includes("/in/")) {
+        const hydrated = parseLinkedInHydrationState();
+        if (hydrated) {
+          name = hydrated.name;
+          subtitle = hydrated.subtitle;
+        }
       }
 
-      // Parse "Title at Company" from subtitle
+      // 2. DOM Selectors Fallback
+      if (!name) {
+        for (const sel of RECIPIENT_NAME_SELECTORS) {
+          try {
+            const el = document.querySelector(sel);
+            const t  = elText(el);
+            if (t && t.length > 1) { name = t; break; }
+          } catch (_) {}
+        }
+      }
+
+      if (!subtitle) {
+        for (const sel of RECIPIENT_SUBTITLE_SELECTORS) {
+          try {
+            const el = document.querySelector(sel);
+            const t  = elText(el);
+            if (t) { subtitle = t; break; }
+          } catch (_) {}
+        }
+      }
+
+      // Robust fallback for LinkedIn's new obfuscated DOM (which removes h1s and standard classes).
+      // Profile page titles usually look like: "Kiran Poojary - Chief Technology Officer at Simple Energy | LinkedIn"
+      if ((!name || !subtitle) && document.title.includes("LinkedIn")) {
+        const titleText = document.title.replace(/\s*\|\s*LinkedIn\s*$/, "");
+        const parts = titleText.split(/\s+-\s+/);
+        if (!name && parts.length > 0) {
+          name = cleanStr(parts[0]);
+        }
+        if (!subtitle && parts.length > 1) {
+          subtitle = cleanStr(parts.slice(1).join(" - "));
+        }
+      }
+
+      // Parse title + company from headline using robust multi-pattern extractor
       let title   = "";
       let company = "";
       if (subtitle) {
-        const atMatch = subtitle.match(/^(.+?)\s+at\s+(.+)$/i);
-        if (atMatch) {
-          title   = cleanStr(atMatch[1]);
-          company = cleanStr(atMatch[2]);
-        } else {
-          title = subtitle;
+        const extracted = extractTitleAndCompany(subtitle);
+        title   = extracted.title;
+        company = extracted.company;
+      }
+
+      // Fallback: If no company found in headline, check the profile's 'Current company' badge
+      if (!company) {
+        const companyBadge = document.querySelector(".pv-text-details__right-panel .inline-show-more-text, button[aria-label*='Current company']");
+        if (companyBadge) {
+          company = elText(companyBadge);
         }
       }
 
@@ -806,61 +925,217 @@
       return name ? { name, firstName, title, company } : null;
     }
 
-    function pushRecipientToStorage(data) {
-      if (!data) return;
-      chrome.storage.local.set({ linkedinRecipient: { ...data, detectedAt: Date.now() } });
+    /** Extract title + company from a LinkedIn headline/subtitle string.
+     *  Handles all common LinkedIn headline formats:
+     *    "Software Engineer at Qualcomm"          → standard
+     *    "Software Engineer @Qualcomm | 802.15.4" → @symbol + noise
+     *    "@Qualcomm | Software Engineer"           → company first
+     *    "Software Engineer | Qualcomm | NIT"      → pipe-separated
+     *    "Software Engineer · Qualcomm"            → bullet-separated
+     */
+    function extractTitleAndCompany(subtitle) {
+      if (!subtitle) return { title: "", company: "" };
+      const s = subtitle.trim();
+
+      // 1. "Title at Company [noise]"
+      const atWord = s.match(/^(.+?)\s+at\s+([^|·•\n]+?)(?:\s*[|·•||].*)?$/i);
+      if (atWord) return { title: cleanStr(atWord[1]), company: cleanStr(atWord[2]) };
+
+      // 2. "Title @Company [noise]" — e.g. "Software Engineer @Qualcomm || 802.15.4"
+      const atSym = s.match(/^(.*?)\s*@([A-Za-z][A-Za-z0-9\s\-&.,']+?)(?:\s*(?:[|·•]|\|\|).*)?$/);
+      if (atSym && atSym[2]) {
+        return { title: cleanStr(atSym[1] || ""), company: cleanStr(atSym[2]) };
+      }
+
+      // 3. "@Company" alone (no title in subtitle — title may be on another element)
+      const atOnly = s.match(/^@([A-Za-z][A-Za-z0-9\s\-&.,']+?)(?:\s*(?:[|·•]|\|\|).*)?$/);
+      if (atOnly) return { title: "", company: cleanStr(atOnly[1]) };
+
+      // 4. "Title | Company [| ...]", "Title · Company", or "Title - Company"
+      // Safely split by pipe, bullet, or spaced dashes
+      const parts = s.split(/\s*(?:[|·•]|\|\|)\s*|\s+[-–—]\s+/);
+      if (parts.length >= 2) {
+        // Heuristic: company-like part is title-cased and short (< 40 chars),
+        // not a number, not a hash/spec token
+        const companyPart = parts.find((p, i) => i > 0 && /^[A-Z]/.test(p) && p.length < 40 && !/^\d/.test(p));
+        if (companyPart) return { title: cleanStr(parts[0]), company: cleanStr(companyPart) };
+        return { title: cleanStr(parts[0]), company: "" };
+      }
+
+      return { title: cleanStr(s), company: "" };
     }
 
-    /* ── Paste into LinkedIn's contenteditable message box ── */
+    function pushRecipientToStorage(data) {
+      if (!data) return;
+      try {
+        const p = chrome.storage.local.set({ linkedinRecipient: { ...data, detectedAt: Date.now() } });
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) {
+        // Suppress orphaned script errors
+      }
+    }
+
+    /* ── Paste into LinkedIn's contenteditable message box ──
+       Strategies tried in order (most specific → most permissive):
+         1. document.activeElement — if user clicked the box before pressing Paste
+         2. Named compose selectors — covers all known LinkedIn compose surfaces
+         3. Any visible contenteditable on page
+         4. Any visible <textarea> (fallback for non-React surfaces)
+       Text insertion also uses multiple techniques because LinkedIn's React
+       synthetic event system ignores plain DOM mutations on some builds.
+    ────────────────────────────────────────────── */
     function pasteIntoLinkedInMessageBox(text) {
-      // Try multiple selectors for the active message composer
-      const COMPOSER_SELECTORS = [
-        // Messaging page
+      const box = findComposeBox();
+      if (!box) throw new Error("LinkedIn message box not found on page.");
+
+      insertTextIntoBox(box, text);
+    }
+
+    function findComposeBox() {
+      // 1. Best: use whatever element currently has keyboard focus
+      const active = document.activeElement;
+      if (active && isEditableBox(active)) return active;
+
+      // 2. Named selectors — ordered from most-specific to broadest
+      //    Covers: InMail modal, regular messaging page, overlay bubble,
+      //    connection request note, and generic artdeco modal compose areas.
+      const SELECTORS = [
+        // InMail / "New message" modal opened from a profile page
+        ".artdeco-modal__content .msg-form__contenteditable",
+        ".artdeco-modal__content [contenteditable='true']",
+        ".artdeco-modal [contenteditable='true']",
+        // Standard full-page messaging (/messaging/thread/*)
         ".msg-form__contenteditable",
-        // Messaging overlay
+        // Messaging overlay bubble (bottom-right of screen)
         ".msg-overlay-conversation-bubble--active .msg-form__contenteditable",
-        // InMail / send message modal
-        ".artdeco-modal .msg-form__contenteditable",
-        // Generic contenteditable inside any active compose area
+        ".msg-overlay-list-bubble .msg-form__contenteditable",
+        // Connection request note textarea
+        ".connect-button-send-invite__custom-message",
+        // Any focused/active compose wrapper
         "[data-artdeco-is-focused='true'] [contenteditable='true']",
+        // Generic role=textbox (React accessibility pattern)
         "[contenteditable='true'][role='textbox']",
+        "[contenteditable='true']",
       ];
 
-      let box = null;
-      for (const sel of COMPOSER_SELECTORS) {
+      for (const sel of SELECTORS) {
         try {
           const el = document.querySelector(sel);
-          if (el) { box = el; break; }
+          if (el && isVisible(el)) return el;
         } catch (_) {}
       }
 
-      if (!box) throw new Error("LinkedIn message box not found on page.");
+      // 3. Any visible contenteditable on page (last resort)
+      const allEditable = [...document.querySelectorAll("[contenteditable='true']")];
+      const visible = allEditable.find(isVisible);
+      if (visible) return visible;
 
-      box.focus();
-      // Clear existing placeholder text (LinkedIn uses an empty <p> with class)
-      const existingP = box.querySelector("p");
-      if (existingP && existingP.textContent.trim() === "") {
-        existingP.remove();
-      }
-
-      // Insert using document.execCommand for broadest compatibility in content scripts
-      if (document.queryCommandSupported && document.queryCommandSupported("insertText")) {
-        document.execCommand("insertText", false, text);
-      } else {
-        // Fallback: set innerHTML directly and fire input event
-        box.textContent = text;
-        box.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-
-      // Dispatch additional events LinkedIn listens to
-      box.dispatchEvent(new Event("input",  { bubbles: true }));
-      box.dispatchEvent(new Event("change", { bubbles: true }));
+      // 4. Any visible textarea
+      const allTextareas = [...document.querySelectorAll("textarea")];
+      return allTextareas.find(isVisible) || null;
     }
 
-    // Expose paste handler globally so the message listener above can call it
-    window.__mailerPasteLinkedIn = pasteIntoLinkedInMessageBox;
+    function isEditableBox(el) {
+      if (!el) return false;
+      const tag = el.tagName.toLowerCase();
+      return tag === "textarea" ||
+             el.getAttribute("contenteditable") === "true" ||
+             el.getAttribute("role") === "textbox";
+    }
 
-    /* ── Observe and push recipient continuously ── */
+    function isVisible(el) {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      const style = window.getComputedStyle(el);
+      return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+    }
+
+    function insertTextIntoBox(box, text) {
+      box.focus();
+
+      // ── Strategy A: Native Input Event (works with React 16+ synthetic events) ──
+      // This is the most reliable for LinkedIn's React build.
+      const nativeInput = Object.getOwnPropertyDescriptor(
+        window.HTMLElement.prototype, "innerHTML"
+      );
+      try {
+        // Set selection to end of existing content
+        const sel = window.getSelection();
+        if (sel && box.childNodes.length > 0) {
+          const range = document.createRange();
+          range.selectNodeContents(box);
+          range.collapse(false); // collapse to end
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+
+        // Fire a beforeinput event (React listens to this)
+        const beforeInput = new InputEvent("beforeinput", {
+          bubbles: true, cancelable: true,
+          inputType: "insertText", data: text,
+        });
+        const cancelled = !box.dispatchEvent(beforeInput);
+
+        if (!cancelled) {
+          // If beforeinput wasn't cancelled by React, also fire execCommand
+          // as Chrome uses both paths
+          if (document.execCommand) {
+            document.execCommand("insertText", false, text);
+          }
+        }
+
+        // Always fire input + change so LinkedIn's send button activates
+        box.dispatchEvent(new InputEvent("input",  { bubbles: true, inputType: "insertText", data: text }));
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+
+        // Verify text was actually inserted
+        const boxText = box.textContent || box.value || "";
+        if (boxText.trim().length > 0) return; // success
+      } catch (_) {}
+
+      // ── Strategy B: execCommand fallback ──
+      try {
+        box.focus();
+        if (document.execCommand("selectAll", false)) {
+          document.execCommand("delete", false);
+        }
+        document.execCommand("insertText", false, text);
+        box.dispatchEvent(new Event("input",  { bubbles: true }));
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        const b = box.textContent || box.value || "";
+        if (b.trim().length > 0) return;
+      } catch (_) {}
+
+      // ── Strategy C: Direct DOM manipulation ──
+      // Works if strategies A & B both fail (non-React textareas, etc.)
+      if (box.tagName.toLowerCase() === "textarea") {
+        box.value = text;
+      } else {
+        // Preserve LinkedIn's <p> wrapper structure if present
+        const p = document.createElement("p");
+        p.textContent = text;
+        box.innerHTML = "";
+        box.appendChild(p);
+      }
+      box.dispatchEvent(new Event("input",  { bubbles: true }));
+      box.dispatchEvent(new Event("change", { bubbles: true }));
+      // Trigger React's internal fiber update
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLElement.prototype, "innerText"
+      );
+      if (nativeInputValueSetter?.set) {
+        nativeInputValueSetter.set.call(box, text);
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+
+
+    // Expose handlers via window so the message listener (outer scope) can call them
+    window.__mailerPasteLinkedIn    = pasteIntoLinkedInMessageBox;
+    window.__mailerScrapeRecipient  = scrapeLinkedInRecipient;
+
+    /* -- Observe and push recipient continuously -- */
     let lastRecipientName = "";
     let recipientDebounce = null;
 
@@ -875,9 +1150,9 @@
       }, delay);
     }
 
-    // Initial scrape
-    scheduleRecipientScrape(1200);
-    scheduleRecipientScrape(3000);
+    // Initial scrape — run at 800ms and again at 2.5s for SPAs that render late
+    scheduleRecipientScrape(800);
+    scheduleRecipientScrape(2500);
 
     // Re-scrape on any DOM change (conversation switches, modal opens)
     const recipientObserver = new MutationObserver(() => scheduleRecipientScrape(500));

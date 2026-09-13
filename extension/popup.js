@@ -8,45 +8,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const TEMPLATES = [
     {
-      id:    "applied",
-      label: "Applied & Reaching Out",
-      desc:  "Best when you've already applied",
+      id:    "referral",
+      label: "Referral Request",
+      desc:  "Subtle request for a referral after applying",
       body:
 `Hi {first_name},
 
-I recently applied for the {role} role at {company} and wanted to connect directly — I'm genuinely excited about this opportunity.
+I applied for the {role} role at {company} and wanted to reach out. I'm genuinely excited about your team's work.
 
-I'd love to hear more about the team and what you're looking for. Even a quick 10-minute chat would mean a lot.
+I'd really appreciate any guidance or a potential referral. Happy to share my resume if it helps.
 
-Thanks so much for your time!`,
+Thanks for your time.`,
     },
     {
-      id:    "value",
-      label: "Lead with Value",
-      desc:  "Strong opener for any hiring contact",
+      id:    "shortlisting",
+      label: "Interview Shortlisting",
+      desc:  "Highlight a key skill for current openings",
       body:
 `Hi {first_name},
 
-I came across the {role} opening at {company} and I'm really excited about the fit. I've been working on [your key skill / recent win] and believe I can bring real value to your team.
+I saw the {role} opening at {company}. Given my background in software development and agentic AI, I believe I could contribute meaningfully.
 
-Would you be open to a quick 10-minute call to explore if there's a match?
+I'd love to be considered for an interview if there's a mutual fit. Open to a brief chat?
 
-Looking forward to connecting!`,
+Thanks!`,
     },
     {
-      id:    "curiosity",
-      label: "Curiosity & Culture",
-      desc:  "Works great for warm, conversational tone",
+      id:    "future",
+      label: "Future Consideration",
+      desc:  "Keep in touch for future roles",
       body:
 `Hi {first_name},
 
-I applied for the {role} position at {company} and couldn't help reaching out — I'm genuinely impressed by what the team is building.
+I've been following {company} and am really impressed by what the team is building. I wanted to connect and stay on your radar for any future {role} opportunities.
 
-No pressure at all, but I'd love to hear what working at {company} is actually like from someone on the inside. Even a few words in reply would make my day!
+Thanks for connecting, and I look forward to keeping in touch.`,
+    },
+    {
+      id:    "alumni",
+      label: "Alumni Connection",
+      desc:  "Reach out to fellow TIET alumni",
+      body:
+`Hi {first_name},
 
-Thanks for reading — really appreciate it.`,
+Great to see a fellow alum from Thapar Institute of Engineering and Technology! I recently applied for the {role} role at {company} and would love to connect.
+
+If you have a moment, I'd appreciate any guidance or a referral.
+
+Go TIET!`,
     },
   ];
+
 
   let _activeTemplateId = TEMPLATES[0].id;
 
@@ -220,12 +232,19 @@ Thanks for reading — really appreciate it.`,
     if (changes.contextCompany?.newValue) { companyInput.value = changes.contextCompany.newValue; flashField(companyInput); chrome.storage.local.remove("contextCompany"); }
     if (changes.contextRole?.newValue)    { roleInput.value    = changes.contextRole.newValue;    flashField(roleInput);    chrome.storage.local.remove("contextRole");    }
     if (changes.contextBoard?.newValue)   { boardInput.value   = changes.contextBoard.newValue;   chrome.storage.local.remove("contextBoard"); }
-    // If recipient updates while message tab is open, refresh it
+    // Recipient arrived from content script while popup is open
     if (changes.linkedinRecipient?.newValue) {
       const msgView = document.getElementById("message-view");
       if (msgView && !msgView.classList.contains("hidden")) {
-        renderRecipient(changes.linkedinRecipient.newValue);
-        buildPreview();
+        const r = changes.linkedinRecipient.newValue;
+        _currentRecipient = r;
+        renderRecipient(r);
+        // Kick off DB lookup now that we have the company name
+        if (r.company && r.company !== (_currentApp?.company_name || "")) {
+          lookupApplication(r.company);
+        } else {
+          buildPreview();
+        }
       }
     }
   });
@@ -326,7 +345,22 @@ Thanks for reading — really appreciate it.`,
       renderRecipient(_currentRecipient);
       await lookupApplication(_currentRecipient.company);
     } else {
-      showNoRecipient();
+      // Actively ask content script if no fresh recipient in storage
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, { action: "get_linkedin_recipient" }, async (response) => {
+            if (chrome.runtime.lastError || !response?.recipient) {
+              showNoRecipient();
+            } else {
+              _currentRecipient = response.recipient;
+              renderRecipient(_currentRecipient);
+              await lookupApplication(_currentRecipient.company);
+            }
+          });
+        } else {
+          showNoRecipient();
+        }
+      });
     }
 
     buildPreview();
@@ -342,6 +376,28 @@ Thanks for reading — really appreciate it.`,
 
     document.getElementById("paste-msg-btn").addEventListener("click", pasteMessage);
     document.getElementById("copy-msg-btn").addEventListener("click", copyMessage);
+    document.getElementById("retry-fetch-btn")?.addEventListener("click", retryFetchRecipient);
+  }
+
+  function retryFetchRecipient() {
+    const btn = document.getElementById("retry-fetch-btn");
+    if (btn) btn.innerHTML = "Fetching...";
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "get_linkedin_recipient" }, async (response) => {
+          if (btn) btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; margin-right:4px;"><path d="M2.5 8a5.5 5.5 0 1 1 1.61 3.89L2.5 13.5M2.5 8v5.5h5.5"/></svg>Retry Fetch`;
+          if (chrome.runtime.lastError || !response?.recipient) {
+            showNoRecipient();
+          } else {
+            _currentRecipient = response.recipient;
+            renderRecipient(_currentRecipient);
+            await lookupApplication(_currentRecipient.company);
+          }
+        });
+      } else {
+        if (btn) btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; margin-right:4px;"><path d="M2.5 8a5.5 5.5 0 1 1 1.61 3.89L2.5 13.5M2.5 8v5.5h5.5"/></svg>Retry Fetch`;
+      }
+    });
   }
 
   /** Render 3 pill buttons into #template-picker (created in HTML) */
@@ -421,35 +477,83 @@ Thanks for reading — really appreciate it.`,
   }
 
   async function lookupApplication(company) {
-    if (!company) { showNoApp(); return; }
+    // Show loading state immediately
+    showAppLoading();
+
+    if (!company || !company.trim()) {
+      // Company not detected yet — wait briefly for content script to push an update,
+      // then re-check storage once before giving up
+      setTimeout(async () => {
+        const fresh = await getStorage(["linkedinRecipient"]);
+        const r     = fresh.linkedinRecipient;
+        if (r?.company && r.company !== (_currentRecipient?.company || "")) {
+          _currentRecipient = { ..._currentRecipient, ...r };
+          renderRecipient(_currentRecipient);
+          await lookupApplication(r.company);
+        } else {
+          showNoApp();
+          buildPreview();
+        }
+      }, 2000);
+      return;
+    }
+
     try {
       const stored   = await getStorage(["apiUrl", "apiToken"]);
       const apiUrl   = stored.apiUrl   || "http://127.0.0.1:8000";
       const apiToken = stored.apiToken;
-      if (!apiToken) { showNoApp(); return; }
+      
+      if (!apiToken) { 
+        console.error("No API Token found in Extension Settings.");
+        document.getElementById("msg-status").textContent = "API Token missing! Please configure in Settings.";
+        document.getElementById("msg-status").style.display = "block";
+        document.getElementById("msg-status").style.color = "#f44336";
+        showNoApp(); 
+        buildPreview(); 
+        return; 
+      }
 
       const res = await fetch(
         `${apiUrl}/api/applications?search=${encodeURIComponent(company)}&sort=newest`,
         { headers: { "Authorization": `Bearer ${apiToken}` } }
       );
-      if (!res.ok) { showNoApp(); return; }
+      
+      if (!res.ok) { 
+        console.error("Backend fetch failed. Status:", res.status);
+        document.getElementById("msg-status").textContent = `Backend error: ${res.status}`;
+        document.getElementById("msg-status").style.display = "block";
+        document.getElementById("msg-status").style.color = "#f44336";
+        showNoApp(); 
+        buildPreview(); 
+        return; 
+      }
 
       const data = await res.json();
       const apps = data.applications || [];
 
-      // Find the closest match: prefer exact company name, fallback to any
-      const exact = apps.find(a => a.company_name.toLowerCase() === company.toLowerCase());
-      _currentApp  = exact || apps[0] || null;
+      // Prefer exact company name match, then fuzzy (search already filters), then first result
+      const exact = apps.find(a =>
+        a.company_name.toLowerCase().trim() === company.toLowerCase().trim()
+      );
+      _currentApp = exact || apps[0] || null;
 
       if (_currentApp) {
         showMatchedApp(_currentApp);
       } else {
         showNoApp();
       }
-    } catch {
+    } catch (e) {
       showNoApp();
     }
     buildPreview();
+  }
+
+  function showAppLoading() {
+    document.getElementById("matched-app-badge").classList.add("hidden");
+    const noBadge = document.getElementById("no-app-badge");
+    noBadge.classList.remove("hidden");
+    const span = noBadge.querySelector("span");
+    if (span) span.textContent = "Looking up application...";
   }
 
   function showMatchedApp(app) {
@@ -466,21 +570,46 @@ Thanks for reading — really appreciate it.`,
   }
 
   function buildPreview() {
-    const template  = document.getElementById("msg-template-editor")?.value || "";
-    const r         = _currentRecipient || {};
-    const app       = _currentApp;
-    const resolved  = template
-      .replace(/\{first_name\}/g, r.firstName || r.name?.split(" ")[0] || "there")
-      .replace(/\{name\}/g,       r.name      || "")
-      .replace(/\{title\}/g,      r.title     || "")
-      .replace(/\{company\}/g,    r.company   || (app?.company_name) || "your company")
-      .replace(/\{role\}/g,       (app?.role) || "the role");
+    const template = document.getElementById("msg-template-editor")?.value || "";
+    const r        = _currentRecipient || {};
+    const app      = _currentApp;
+
+    const resolved = template
+      .replace(/\{first_name\}/g, r.firstName || r.name?.split(" ")[0] || "{first_name}")
+      .replace(/\{name\}/g,       r.name      || "{name}")
+      .replace(/\{title\}/g,      r.title     || "{title}")
+      .replace(/\{company\}/g,    r.company   || app?.company_name || "{company}")
+      .replace(/\{role\}/g,       app?.role   || "{role}");
 
     const preview = document.getElementById("msg-preview");
-    if (preview) preview.textContent = resolved;
+    if (!preview) return;
+    preview.textContent = resolved;
+
+    // Highlight any still-unresolved placeholders so user notices
+    const hasUnresolved = /\{(first_name|name|title|company|role)\}/.test(resolved);
+    preview.classList.toggle("has-unresolved", hasUnresolved);
+
+    // Show a small hint below the preview if vars are missing
+    const hint = document.getElementById("preview-hint");
+    if (hint) {
+      if (hasUnresolved) {
+        const missing = [];
+        if (/\{first_name\}/.test(resolved)) missing.push("recipient name");
+        if (/\{company\}/.test(resolved))    missing.push("company");
+        if (/\{role\}/.test(resolved))       missing.push("role from DB");
+        hint.textContent = `Still resolving: ${missing.join(", ")}`;
+        hint.classList.remove("hidden");
+      } else {
+        hint.classList.add("hidden");
+      }
+    }
+    // Toggle the "All vars resolved" badge
+    const resolvedBadge = document.getElementById("preview-resolved-badge");
+    if (resolvedBadge) resolvedBadge.classList.toggle("hidden", hasUnresolved);
   }
 
   async function pasteMessage() {
+
     const pasteBtn  = document.getElementById("paste-msg-btn");
     const msgStatus = document.getElementById("msg-status");
     const text      = document.getElementById("msg-preview")?.textContent || "";
@@ -496,14 +625,15 @@ Thanks for reading — really appreciate it.`,
     const tab  = tabs[0];
     if (!tab?.id) { showMsgStatus("No active tab.", "error"); setPasteLoading(false); return; }
 
-    chrome.tabs.sendMessage(tab.id, { action: "paste_linkedin_message", text }, (response) => {
+    chrome.tabs.sendMessage(tab.id, { action: "paste_linkedin_message", text }, async (response) => {
       setPasteLoading(false);
       if (chrome.runtime.lastError || !response?.ok) {
-        const err = response?.error || chrome.runtime.lastError?.message || "";
-        if (err.includes("not found")) {
-          showMsgStatus("Message box not found — click inside the LinkedIn message area first.", "error");
-        } else {
-          showMsgStatus("Paste failed. Try copying instead.", "error");
+        // Auto-fallback: copy to clipboard so user can just Ctrl+V
+        try {
+          await navigator.clipboard.writeText(text);
+          showMsgStatus("Copied! Click inside the message box, then press Ctrl+V.", "success");
+        } catch {
+          showMsgStatus("Paste failed — click inside the LinkedIn message box first, then try again.", "error");
         }
       } else {
         showMsgStatus("Pasted into message box! \u2713", "success");

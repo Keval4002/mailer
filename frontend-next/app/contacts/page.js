@@ -75,11 +75,28 @@ function StatusBadge({ pending, sent, failed }) {
   </span>;
 }
 
-function EmailTimeline({ jobs }) {
+function EmailTimeline({ jobs, onReschedule }) {
+  const [reschedulingId, setReschedulingId] = useState(null);
+  const [newTime, setNewTime] = useState("");
+  const [saving, setSaving] = useState(false);
+
   if (!jobs?.length) return null;
 
   const stepLabels = ["Initial Email", "Follow-up 1", "Follow-up 2"];
   const stepColors = ["#7c6dff", "#3b9eff", "#22d3ee"];
+
+  const handleSave = async (job) => {
+    setSaving(true);
+    try {
+      const dt = new Date(newTime).toISOString();
+      await api.post(`/api/mail-jobs/${job.id}/reschedule`, { new_time: dt });
+      if (onReschedule) onReschedule(job.id, dt);
+      setReschedulingId(null);
+    } catch (err) {
+      alert("Failed to reschedule: " + (err.response?.data?.detail || err.message));
+    }
+    setSaving(false);
+  };
 
   return (
     <div className="mt-3 flex flex-col gap-0">
@@ -107,7 +124,7 @@ function EmailTimeline({ jobs }) {
               {!isLast && <div className="w-[1px] flex-1 my-1" style={{ background: "var(--border)" }} />}
             </div>
             {/* content */}
-            <div className="pb-3 min-w-0">
+            <div className="pb-3 min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{stepLabels[i] || `Step ${i + 1}`}</span>
                 {isSent && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(46,170,101,0.1)", color: "#2eaa65" }}>Sent</span>}
@@ -115,8 +132,40 @@ function EmailTimeline({ jobs }) {
                 {isFailed && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(224,80,80,0.1)", color: "#e05050" }}>Failed</span>}
                 {isBlocked && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(245,166,35,0.1)", color: "#f5a623" }}>Blocked</span>}
                 {isCancelled && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(245,166,35,0.1)", color: "#f5a623" }}>Cancelled</span>}
+                
+                {isPending && reschedulingId !== job.id && (
+                  <button onClick={() => {
+                      setReschedulingId(job.id);
+                      const d = new Date(job.scheduled_at);
+                      // Format to YYYY-MM-DDTHH:mm for datetime-local input
+                      const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                      setNewTime(localIso);
+                    }} 
+                    className="text-[9px] text-[#7c6dff] hover:underline ml-auto">
+                    Reschedule
+                  </button>
+                )}
               </div>
-              <div className="text-xs text-text-muted font-mono mt-0.5">{fmtDate(job.scheduled_at)}</div>
+              
+              {reschedulingId === job.id ? (
+                <div className="mt-2 flex items-center gap-2 bg-[var(--neutral-soft)] p-2 rounded border border-border">
+                  <input 
+                    type="datetime-local" 
+                    value={newTime}
+                    onChange={e => setNewTime(e.target.value)}
+                    className="text-xs bg-transparent border border-[var(--border)] rounded px-1.5 py-0.5 text-text-main"
+                  />
+                  <button onClick={() => handleSave(job)} disabled={saving} className="text-[10px] font-bold bg-[#7c6dff] text-white px-2 py-1 rounded">
+                    {saving ? "..." : "Save"}
+                  </button>
+                  <button onClick={() => setReschedulingId(null)} className="text-[10px] text-text-subtle hover:text-text-main">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="text-xs text-text-muted font-mono mt-0.5">{fmtDate(job.scheduled_at)}</div>
+              )}
+              
               {job.subject && <div className="text-[11px] text-text-subtle mt-0.5 truncate max-w-[280px]">{job.subject}</div>}
               {isFailed && job.last_error && <div className="text-[11px] text-[#e05050] mt-1 italic max-w-[280px] truncate" title={job.last_error}>{job.last_error}</div>}
               {isBlocked && job.blocked_reason && <div className="text-[11px] text-[#f5a623] mt-1 italic max-w-[280px] truncate" title={job.blocked_reason}>Reason: {job.blocked_reason.replace(/_/g, ' ')}</div>}
@@ -133,6 +182,7 @@ function ContactCard({ c, onReplied }) {
   const [jobs, setJobs] = useState(null);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [markingReplied, setMarkingReplied] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [replied, setReplied] = useState(c.has_replied === 1);
 
   const handleExpand = async () => {
@@ -160,6 +210,17 @@ function ContactCard({ c, onReplied }) {
       alert('Failed to mark replied: ' + err.message);
     }
     setMarkingReplied(false);
+  };
+
+  const handleCancelSequence = async () => {
+    setCancelling(true);
+    try {
+      await api.post(`/api/contacts/${c.id}/cancel-jobs`);
+      if (jobs) setJobs(jobs.map(j => j.status === 'pending' || j.status === 'gmail_scheduled' ? {...j, status: 'cancelled'} : j));
+    } catch (err) {
+      alert('Failed to cancel sequence: ' + err.message);
+    }
+    setCancelling(false);
   };
 
   const nextDate = c.next_scheduled_at;
@@ -244,22 +305,42 @@ function ContactCard({ c, onReplied }) {
                   <CalendarDays size={10} /> Email Schedule
                 </div>
                 {!replied && hasActiveJobs && (
-                  <button
-                    onClick={handleMarkReplied}
-                    disabled={markingReplied}
-                    className="text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all"
-                    style={{
-                      background: markingReplied ? "var(--neutral-soft)" : "rgba(46,170,101,0.1)",
-                      borderColor: "rgba(46,170,101,0.3)",
-                      color: "#2eaa65",
-                      cursor: markingReplied ? "wait" : "pointer",
-                    }}
-                  >
-                    {markingReplied ? "Cancelling…" : "✓ They Replied — Cancel Follow-ups"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCancelSequence}
+                      disabled={cancelling}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all"
+                      style={{
+                        background: cancelling ? "var(--neutral-soft)" : "rgba(245,166,35,0.1)",
+                        borderColor: "rgba(245,166,35,0.3)",
+                        color: "#f5a623",
+                        cursor: cancelling ? "wait" : "pointer",
+                      }}
+                    >
+                      {cancelling ? "Cancelling…" : "Cancel Sequence"}
+                    </button>
+                    <button
+                      onClick={handleMarkReplied}
+                      disabled={markingReplied}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all"
+                      style={{
+                        background: markingReplied ? "var(--neutral-soft)" : "rgba(46,170,101,0.1)",
+                        borderColor: "rgba(46,170,101,0.3)",
+                        color: "#2eaa65",
+                        cursor: markingReplied ? "wait" : "pointer",
+                      }}
+                    >
+                      {markingReplied ? "Cancelling…" : "✓ They Replied — Cancel Follow-ups"}
+                    </button>
+                  </div>
                 )}
               </div>
-              <EmailTimeline jobs={jobs} />
+              <EmailTimeline 
+                jobs={jobs} 
+                onReschedule={(jobId, newTime) => {
+                  setJobs(jobs.map(j => j.id === jobId ? { ...j, scheduled_at: newTime } : j));
+                }} 
+              />
             </>
           ) : (
             <div className="text-xs text-text-subtle">No emails scheduled.</div>

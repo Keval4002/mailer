@@ -821,6 +821,32 @@ class JobsMixin:
             )
         return self.get_mail_job(job_id)
 
+    def reschedule_job(self, job_id: str, new_time_iso: str):
+        job = self.get_mail_job(job_id)
+        if job["status"] == "sent":
+            raise HTTPException(status_code=400, detail="Cannot reschedule a sent job")
+        if job["status"] == "gmail_scheduled":
+            raise HTTPException(status_code=400, detail="Cannot reschedule a job already scheduled in Gmail")
+            
+        parsed = parse_datetime(new_time_iso)
+        updated_at = to_storage_datetime(utc_now())
+
+        with self.connect() as connection:
+            connection.execute(
+                """
+                UPDATE mail_jobs
+                SET scheduled_at = ?, requested_scheduled_at = ?, timezone_label = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    to_storage_datetime(parsed),
+                    parsed.isoformat(),
+                    parsed.tzname() or parsed.isoformat()[-6:],
+                    updated_at,
+                    job_id,
+                ),
+            )
+        return self.get_mail_job(job_id)
     def cancel_mail_job(self, job_id: str):
         job = self.get_mail_job(job_id)
         if job["status"] != "pending":

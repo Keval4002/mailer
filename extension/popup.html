@@ -161,6 +161,12 @@
         <path d="M27 28h6M30 25v6"/>
       </svg>
       <p>Open a LinkedIn message or profile<br/>to detect the recipient automatically.</p>
+      <button id="retry-fetch-btn" class="btn-ghost btn-sm" style="margin-top: 12px; width: auto; align-self: center;">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; margin-right:4px;">
+          <path d="M2.5 8a5.5 5.5 0 1 1 1.61 3.89L2.5 13.5M2.5 8v5.5h5.5"/>
+        </svg>
+        Retry Fetch
+      </button>
     </div>
 
     <!-- Matched application pill -->
@@ -204,9 +210,14 @@
 
       <!-- Preview -->
       <div class="field-group">
-        <label class="field-label">Preview</label>
+        <div class="msg-template-header">
+          <label class="field-label">Preview</label>
+          <span id="preview-resolved-badge" class="preview-resolved hidden">✓ All vars resolved</span>
+        </div>
         <div id="msg-preview" class="msg-preview"></div>
+        <div id="preview-hint" class="preview-hint hidden"></div>
       </div>
+
     </div>
 
     <!-- Message tab footer -->
