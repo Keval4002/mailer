@@ -265,6 +265,7 @@ class ContactsMixin:
         company: Optional[str] = None,
         title: Optional[str] = None,
         linkedin_url: Optional[str] = None,
+        number: Optional[str] = None,
         source: str = "local_ai",
         apollo_person_id: Optional[str] = None,
         apollo_organization_id: Optional[str] = None,
@@ -293,6 +294,7 @@ class ContactsMixin:
             first_name=first_name,
             last_name=last_name,
             linkedin_url=linkedin_url,
+            number=number,
             title=title,
             headline=headline,
             company=company,
@@ -342,11 +344,11 @@ class ContactsMixin:
                 """
                 INSERT INTO contacts (
                     id, apollo_person_id, apollo_organization_id, email, linkedin_key, email_status, name, first_name,
-                    last_name, linkedin_url, title, headline, company, company_domain, city, state, country,
+                    last_name, linkedin_url, number, title, headline, company, company_domain, city, state, country,
                     formatted_address, timezone_name, seniority, departments_json, employment_history_json,
                     apollo_raw_json, source, has_replied, replied_at, created_at, updated_at, last_synced_at, job_application_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
                 """,
                 (
                     contact_id,
@@ -359,6 +361,7 @@ class ContactsMixin:
                     payload.get("first_name"),
                     payload.get("last_name"),
                     payload.get("linkedin_url"),
+                    payload.get("number"),
                     payload.get("title"),
                     payload.get("headline"),
                     payload.get("company"),
@@ -392,7 +395,7 @@ class ContactsMixin:
             """
             UPDATE contacts
             SET apollo_person_id = ?, apollo_organization_id = ?, email = ?, linkedin_key = ?, email_status = ?, name = ?,
-                first_name = ?, last_name = ?, linkedin_url = ?, title = ?, headline = ?, company = ?,
+                first_name = ?, last_name = ?, linkedin_url = ?, number = ?, title = ?, headline = ?, company = ?,
                 company_domain = ?, city = ?, state = ?, country = ?, formatted_address = ?, timezone_name = ?,
                 seniority = ?, departments_json = ?, employment_history_json = ?, apollo_raw_json = ?,
                 source = ?, updated_at = ?, last_synced_at = ?, job_application_id = ?
@@ -408,6 +411,7 @@ class ContactsMixin:
                 merged["first_name"],
                 merged["last_name"],
                 merged["linkedin_url"],
+                merged["number"],
                 merged["title"],
                 merged["headline"],
                 merged["company"],

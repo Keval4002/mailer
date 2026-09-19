@@ -75,6 +75,9 @@ export default function DashboardPage() {
       }
     };
     fetchStats();
+    
+    const interval = setInterval(fetchStats, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (

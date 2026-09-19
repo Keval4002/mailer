@@ -330,6 +330,7 @@ class JobsMixin:
                     contact_data.get("company"),
                     contact_data.get("title"),
                     contact_data.get("linkedin_url"),
+                    number=contact_data.get("number"),
                     job_application_id=contact_data.get("job_application_id"),
                 )
                 # ── Duplicate-campaign guard ───────────────────────────────────────

@@ -250,6 +250,7 @@ class WorkflowContactCreate(BaseModel):
     company: Optional[str] = None
     title: Optional[str] = None
     linkedin_url: Optional[str] = None
+    number: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -525,6 +526,7 @@ def create_app(settings: Optional[Settings] = None):
                         "recipient_name": name or None,
                         "company": company or None,
                         "title": title or None,
+                        "number": c.get("number") or None,
                         "job_application_id": c.get("job_application_id"),
                     },
                     "steps": steps

@@ -247,6 +247,7 @@ class DBMixin:
                     first_name TEXT,
                     last_name TEXT,
                     linkedin_url TEXT,
+                    number TEXT,
                     title TEXT,
                     headline TEXT,
                     company TEXT,

@@ -10,7 +10,9 @@ export default function TopNav() {
   const navLinks = [
     { href: "/", label: "Queue" },
     { href: "/applications", label: "Applications" },
-    { href: "/contacts", label: "Contacts" },
+    { href: "/campaign-builder", label: "Emailer" },
+    { href: "/sequences", label: "Sequences" },
+    { href: "/contacts", label: "Directory" },
     { href: "/reminders", label: "Notes" },
   ];
 
@@ -51,15 +53,6 @@ export default function TopNav() {
           );
         })}
       </nav>
-
-      {/* CTA */}
-      <Link
-        href="/campaign-builder"
-        className="btn px-4 py-2 text-sm"
-      >
-        <Send size={14} />
-        Campaign Builder
-      </Link>
     </header>
   );
 }

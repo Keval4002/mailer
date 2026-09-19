@@ -369,6 +369,23 @@ class SenderMixin:
                 last_inbox_sync_at=current["last_inbox_sync_at"] if current else None,
                 last_error=None,
             )
+
+            # Auto-retry: if any jobs failed due to auth expiration, reset them to pending
+            now_str = to_storage_datetime(utc_now())
+            connection.execute(
+                """
+                UPDATE mail_jobs
+                SET status = 'pending', updated_at = ?
+                WHERE status = 'failed' 
+                  AND (
+                      error_message LIKE '%gmail authorization expired%' 
+                      OR error_message LIKE '%invalid_grant%' 
+                      OR error_message LIKE '%token has been expired%'
+                      OR error_message LIKE '%connect gmail before sending email%'
+                  )
+                """,
+                (now_str,)
+            )
         return self.get_gmail_auth_status()
 
     def disconnect_gmail(self):
@@ -577,6 +594,28 @@ class SenderMixin:
                 )
                 self._record_attempt(connection, job_id, False, blocked_message, None)
                 skip_send = True
+
+            # Double-send paranoia check
+            if not skip_send and job_row.get("workflow_id") and job_row.get("step_id"):
+                duplicate = connection.execute(
+                    """
+                    SELECT id FROM mail_jobs 
+                    WHERE contact_id = ? AND workflow_id = ? AND step_id = ? AND status = 'sent'
+                    """,
+                    (job_row["contact_id"], job_row["workflow_id"], job_row["step_id"])
+                ).fetchone()
+                if duplicate:
+                    blocked_message = "Job blocked because this exact step was already sent successfully"
+                    connection.execute(
+                        """
+                        UPDATE mail_jobs
+                        SET status = 'blocked', blocked_reason = 'already_sent', updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (to_storage_datetime(utc_now()), job_id),
+                    )
+                    self._record_attempt(connection, job_id, False, blocked_message, None)
+                    skip_send = True
 
             if not skip_send:
                 try:

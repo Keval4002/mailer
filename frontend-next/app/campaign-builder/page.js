@@ -174,17 +174,18 @@ function CampaignBuilderContent() {
       } else {
         const cparts = line.split(',').map(p => p.trim());
         if (cparts.length > 1) {
-          let email = "", name = "", company = "", title = "";
+          let email = "", name = "", company = "", title = "", number = "";
           cparts.forEach(p => {
             if (p.includes("@") && p.includes(".")) email = p;
+            else if (p.match(/^\+?[\d\s-]{7,15}$/)) number = p;
             else if (!name && p.length < 30) name = p;
             else if (!title && p.toLowerCase().match(/(engineer|manager|director|head|talent|recruiter)/)) title = p;
             else if (!company && p.length < 40) company = p;
           });
-          if (email || name) newContacts.push({ email, name, company, title });
+          if (email || name) newContacts.push({ email, name, company, title, number });
         } else {
-          if (line.includes("@")) newContacts.push({ email: line, name: "", company: "", title: "" });
-          else newContacts.push({ email: "", name: line, company: "", title: "" });
+          if (line.includes("@")) newContacts.push({ email: line, name: "", company: "", title: "", number: "" });
+          else newContacts.push({ email: "", name: line, company: "", title: "", number: "" });
         }
       }
     }
@@ -204,13 +205,13 @@ function CampaignBuilderContent() {
     const company  = searchParams.get("company");
     const jobAppId = searchParams.get("job_application_id");
     if (company || jobAppId) {
-      setContacts([{ email: "", name: "", company: company || "", title: "", job_application_id: jobAppId || undefined }]);
+      setContacts([{ email: "", name: "", company: company || "", title: "", number: "", job_application_id: jobAppId || undefined }]);
     } else {
-      setContacts([{ email: "", name: "", company: "", title: "" }]);
+      setContacts([{ email: "", name: "", company: "", title: "", number: "" }]);
     }
   }, [searchParams]);
 
-  const addContact    = () => setContacts([...contacts, { email: "", name: "", company: "", title: "" }]);
+  const addContact    = () => setContacts([...contacts, { email: "", name: "", company: "", title: "", number: "" }]);
   const removeContact = (i) => setContacts(contacts.filter((_, idx) => idx !== i));
   const updateContact = (i, field, value) => {
     const c = [...contacts]; c[i][field] = value; setContacts(c);
@@ -353,7 +354,8 @@ function CampaignBuilderContent() {
                       <input type="email" placeholder="Email *" required className="col-span-2" value={c.email} onChange={e => updateContact(i, "email", e.target.value)} />
                       <input type="text" placeholder="First Name" value={c.name} onChange={e => updateContact(i, "name", e.target.value)} />
                       <input type="text" placeholder="Company" value={c.company} onChange={e => updateContact(i, "company", e.target.value)} />
-                      <input type="text" placeholder="Title" className="col-span-2" value={c.title} onChange={e => updateContact(i, "title", e.target.value)} />
+                      <input type="text" placeholder="Title" value={c.title} onChange={e => updateContact(i, "title", e.target.value)} />
+                      <input type="tel" placeholder="Phone Number" value={c.number || ""} onChange={e => updateContact(i, "number", e.target.value)} />
                     </div>
                   ))}
                   <div className="py-4 flex justify-center">
